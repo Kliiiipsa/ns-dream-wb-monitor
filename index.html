@@ -137,6 +137,10 @@
     transition:background .12s;
   }
   .fbtn:hover{background:var(--accent-soft)}
+  #tbody tr{cursor:pointer}
+  #tbl th:last-child,#tbl td:last-child{position:sticky;right:0;background:var(--surface);box-shadow:-8px 0 8px -8px rgba(11,11,11,.22);z-index:1}
+  #tbl th:last-child{z-index:3}
+  tr.dead td:last-child{background:#fbe7e7}
 
   /* Разбор */
   .claude-date{font-size:12.5px; color:var(--muted); margin-bottom:6px}
@@ -633,8 +637,11 @@ function init(){
     searchQ=e.target.value.trim().toLowerCase(); renderTable();
   });
   document.getElementById("tbody").addEventListener("click",function(e){
-    var btn=e.target.closest(".fbtn"); if(!btn) return;
-    openPanel(btn.dataset.sku);
+    if(e.target.closest("a")) return;
+    var btn=e.target.closest(".fbtn");
+    if(btn){ openPanel(btn.dataset.sku); return; }
+    var tr=e.target.closest("tr[data-sku]");
+    if(tr) openPanel(tr.dataset.sku);
   });
   document.getElementById("ovl").addEventListener("click",closePanel);
   document.getElementById("spClose").addEventListener("click",closePanel);
@@ -854,7 +861,7 @@ function renderTable(){
       : (r.rpd>0? fmt1(r.rpd) : '<span style="color:#898781">0</span>');
     var stCell = r.stock===null? '<span style="color:#898781">—</span>'
       : '<span title="'+(r.st? 'в пути к клиенту: '+r.st.toClient+' · от клиента: '+r.st.fromClient+' · возвраты план: '+r.st.returnsPlan:'')+'">'+fmtInt(r.stock)+'</span>';
-    tb+='<tr'+(r.dead?' class="dead" title="Заказы упали до нуля при базе '+r.prevOrders+' шт за прошлый период"':"")+'>'+
+    tb+='<tr data-sku="'+esc(r.sku)+'"'+(r.dead?' class="dead" title="Заказы упали до нуля при базе '+r.prevOrders+' шт за прошлый период"':"")+'>'+
       '<td>'+prodCell(r)+'</td>'+
       '<td>'+fmtInt(r.orders)+'</td>'+
       '<td>'+fmt1(r.opd)+'</td>'+
