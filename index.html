@@ -32,7 +32,7 @@
     font-size:15px; line-height:1.45;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:1080px; margin:0 auto; padding:20px 16px 48px}
+  .wrap{max-width:1240px; margin:0 auto; padding:20px 16px 48px}
 
   /* Шапка */
   header{display:flex; flex-wrap:wrap; align-items:baseline; gap:8px 14px; margin:6px 0 18px}
@@ -100,9 +100,9 @@
   }
   .search:focus{outline:2px solid var(--accent-soft); border-color:var(--accent)}
   .twrap{overflow-x:auto; -webkit-overflow-scrolling:touch}
-  table{border-collapse:collapse; width:100%; min-width:680px; font-variant-numeric:tabular-nums}
+  table{border-collapse:collapse; width:100%; min-width:1080px; font-variant-numeric:tabular-nums}
   th,td{padding:7px 10px; text-align:right; font-size:13.5px; border-bottom:1px solid var(--grid); white-space:nowrap}
-  th{font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.03em; cursor:pointer; user-select:none; position:sticky; top:0; background:var(--surface)}
+  th{font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.03em; cursor:pointer; user-select:none; position:sticky; top:0; background:var(--surface); z-index:2}
   th:hover{color:var(--ink)}
   th .s{font-size:10px}
   th:first-child,td:first-child{text-align:left}
@@ -113,9 +113,80 @@
   tr.dead td:first-child{color:var(--down); font-weight:700}
   .rowcount{font-size:12.5px; color:var(--muted)}
 
+  /* Ячейка товара */
+  .prod{display:flex; align-items:center; gap:9px; max-width:290px}
+  .pimg{width:34px; height:45px; border-radius:6px; object-fit:cover; background:#eceae4; flex:0 0 auto}
+  .pinfo{min-width:0}
+  .pname{font-size:13px; font-weight:600; color:var(--ink); text-decoration:none; display:block;
+         white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px}
+  .pname:hover{color:var(--accent); text-decoration:underline}
+  .pmeta{font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px}
+
+  /* Хватит дней */
+  .dz{display:inline-block; border-radius:8px; padding:2px 9px; font-weight:700; font-size:13px}
+  .dz.red{background:var(--down-bg); color:var(--down)}
+  .dz.orange{background:var(--warn-bg); color:var(--warn)}
+  .dz.green{background:var(--up-bg); color:var(--up)}
+  .dz.gray{background:#efefec; color:var(--muted); font-weight:600}
+  .orderby{font-size:12.5px}
+  .orderby.late{color:var(--down); font-weight:700}
+
+  .fbtn{
+    border:1px solid var(--border); background:var(--surface); color:var(--accent);
+    border-radius:8px; padding:4px 11px; font-size:12.5px; font-weight:600; cursor:pointer;
+    transition:background .12s;
+  }
+  .fbtn:hover{background:var(--accent-soft)}
+
   /* Разбор */
   .claude-date{font-size:12.5px; color:var(--muted); margin-bottom:6px}
   .claude-text{font-size:14.5px; color:var(--ink); white-space:pre-wrap; line-height:1.55}
+
+  /* Выезжающая панель прогноза */
+  .ovl{position:fixed; inset:0; background:rgba(11,11,11,.38); opacity:0; pointer-events:none; transition:opacity .22s; z-index:40}
+  .ovl.open{opacity:1; pointer-events:auto}
+  .spanel{
+    position:fixed; top:0; right:0; height:100%; width:min(760px,100%);
+    background:var(--page); z-index:50; transform:translateX(102%);
+    transition:transform .26s cubic-bezier(.4,0,.2,1);
+    box-shadow:-8px 0 30px rgba(11,11,11,.18);
+    display:flex; flex-direction:column;
+  }
+  .spanel.open{transform:translateX(0)}
+  .sp-head{display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--grid); background:var(--surface); flex:0 0 auto}
+  .sp-img{width:46px; height:61px; border-radius:8px; object-fit:cover; background:#eceae4}
+  .sp-title{min-width:0; flex:1}
+  .sp-title a{font-size:15.5px; font-weight:700; color:var(--ink); text-decoration:none; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .sp-title a:hover{color:var(--accent); text-decoration:underline}
+  .sp-title .m{font-size:12.5px; color:var(--muted)}
+  .sp-close{border:none; background:#efefec; color:var(--ink-2); width:32px; height:32px; border-radius:50%; font-size:16px; cursor:pointer; flex:0 0 auto}
+  .sp-close:hover{background:#e3e2dc}
+  .sp-body{overflow-y:auto; padding:14px 18px 30px; flex:1}
+  .sp-cards{display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-bottom:14px}
+  @media(max-width:560px){.sp-cards{grid-template-columns:repeat(2,1fr)}}
+  .scard{background:var(--surface); border:1px solid var(--border); border-radius:11px; padding:9px 11px; box-shadow:var(--shadow)}
+  .scard .lbl{font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.03em}
+  .scard .val{font-size:18px; font-weight:700; margin-top:1px}
+  .scard .val small{font-size:12.5px; font-weight:600; color:var(--ink-2)}
+  .scard .sub2{font-size:11.5px; color:var(--muted); margin-top:1px}
+  .sp-sec{background:var(--surface); border:1px solid var(--border); border-radius:13px; padding:13px 14px; box-shadow:var(--shadow); margin-bottom:13px}
+  .sp-sec h3{font-size:14px; margin:0 0 9px; font-weight:700}
+  .sp-sec h3 .note{font-weight:500; color:var(--muted); font-size:12px}
+  #fchart{width:100%; display:block}
+  .sp-verdict{font-size:14.5px; line-height:1.5; padding:10px 12px; background:var(--accent-soft); border-radius:10px; margin-top:10px}
+  .sp-verdict b{white-space:nowrap}
+  .sl-row{display:grid; grid-template-columns:150px 1fr 86px; gap:10px; align-items:center; margin:8px 0}
+  @media(max-width:560px){.sl-row{grid-template-columns:110px 1fr 74px}}
+  .sl-row label{font-size:13px; color:var(--ink-2); font-weight:600}
+  .sl-row input[type=range]{width:100%; accent-color:var(--accent)}
+  .sl-val{font-size:13.5px; font-weight:700; text-align:right; font-variant-numeric:tabular-nums}
+  .sreset{
+    border:1px solid var(--border); background:var(--surface); color:var(--ink-2);
+    border-radius:9px; padding:6px 14px; font-size:13px; font-weight:600; cursor:pointer; margin-top:6px;
+  }
+  .sreset:hover{background:#f1f1ee}
+  .sp-comment .claude-text{font-size:13.5px}
+  .sp-comment .auto{color:var(--ink-2)}
 
   /* Служебное */
   #status{padding:40px 0; text-align:center; color:var(--muted); font-size:14px}
@@ -137,7 +208,7 @@
     <span class="sub" id="updated"></span>
   </header>
 
-  <div id="status"><span class="spin"></span>Загружаю данные из таблицы…</div>
+  <div id="status"><span class="spin"></span>Загружаю данные из таблиц…</div>
 
   <div id="app" style="display:none">
     <div class="periods" id="periods">
@@ -158,9 +229,9 @@
     </section>
 
     <section class="panel">
-      <h2>Товары за период</h2>
+      <h2>Товары за период <span class="note" id="stockNote"></span></h2>
       <div class="tbar">
-        <input class="search" id="search" type="search" placeholder="Поиск по артикулу…">
+        <input class="search" id="search" type="search" placeholder="Поиск по артикулу или названию…">
         <span class="rowcount" id="rowcount"></span>
       </div>
       <div class="twrap">
@@ -177,7 +248,42 @@
       <div class="claude-text" id="claudeText">—</div>
     </section>
 
-    <footer>Данные подтягиваются из опубликованной Google-таблицы при каждом открытии страницы.</footer>
+    <footer>Данные подтягиваются из опубликованной Google-таблицы и платной таблицы 10X WB при каждом открытии страницы.<br>
+    Срок поставки для даты «заказать до» берётся из листа config (по умолчанию 20 дней) — его можно менять в таблице.</footer>
+  </div>
+</div>
+
+<!-- Панель прогноза -->
+<div class="ovl" id="ovl"></div>
+<div class="spanel" id="spanel" aria-hidden="true">
+  <div class="sp-head">
+    <img class="sp-img" id="spImg" alt="">
+    <div class="sp-title">
+      <a id="spName" href="#" target="_blank" rel="noopener"></a>
+      <div class="m" id="spMeta"></div>
+    </div>
+    <button class="sp-close" id="spClose" title="Закрыть">✕</button>
+  </div>
+  <div class="sp-body">
+    <div class="sp-cards" id="spCards"></div>
+    <div class="sp-sec">
+      <h3>Заказы: 60 дней истории + прогноз 30 дней <span class="note">линия — среднее за 7 дней, коридор — пессимист/оптимист</span></h3>
+      <svg id="fchart"></svg>
+      <div class="legend" id="fLegend"></div>
+      <div class="sp-verdict" id="spVerdict"></div>
+    </div>
+    <div class="sp-sec">
+      <h3>Симуляция «что если» <span class="note">двигайте ползунки — прогноз и даты пересчитаются</span></h3>
+      <div class="sl-row"><label>Заказы / день</label><input type="range" id="slOrders" min="0" step="0.1"><span class="sl-val" id="slOrdersV"></span></div>
+      <div class="sl-row"><label>Выкуп, %</label><input type="range" id="slBuy" min="0" max="100" step="1"><span class="sl-val" id="slBuyV"></span></div>
+      <div class="sl-row"><label>Цена, ₽</label><input type="range" id="slPrice" min="0" step="10"><span class="sl-val" id="slPriceV"></span></div>
+      <button class="sreset" id="slReset">Сбросить к текущим</button>
+    </div>
+    <div class="sp-sec sp-comment">
+      <h3>Комментарий Claude</h3>
+      <div class="claude-date" id="spCommDate"></div>
+      <div class="claude-text" id="spCommText"></div>
+    </div>
   </div>
 </div>
 
@@ -185,9 +291,23 @@
 "use strict";
 /* ========= НАСТРОЙКИ ========= */
 var PUB_BASE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSXFR70at1ToAW0-aWSGlV9hZDetbf12DiDKlVtmL1Vmwv2ydlurKQe-ECrEuF9tKfDk8RAcr8MdeIG/pub";
-var DATA_CSV_URL = PUB_BASE + "?gid=0&single=true&output=csv";           // лист «Данные (по дням)»
-var ANALYSIS_CSV_URL = PUB_BASE + "?gid=2085265637&single=true&output=csv"; // лист «Анализ»
-var FBS_DATE = "2026-07-27";                // дата перехода на ФБС (config!B1)
+function pubCsv(gid){ return PUB_BASE + "?gid=" + gid + "&single=true&output=csv"; }
+var DATA_CSV_URL     = pubCsv(0);            // «Данные (по дням)»
+var ANALYSIS_CSV_URL = pubCsv(2085265637);   // «Анализ»
+var SPRAV_CSV_URL    = pubCsv(313377354);    // «Справочник»
+var SEZON_CSV_URL    = pubCsv(1988228604);   // «Сезонность»
+var COMM_CSV_URL     = pubCsv(2140403510);   // «Комментарии»
+var CONFIG_CSV_URL   = pubCsv(1329223578);   // «config»
+
+/* Платная таблица 10X WB (новый кабинет) — читаем скрытые технические листы через gviz */
+var PAID_ID = "1rvBJVzeYFAYkzKCXK3EeBDyXBzZaW9DwJ4vcjP07ASg";
+function gvizUrl(sheet, tq){
+  return "https://docs.google.com/spreadsheets/d/" + PAID_ID + "/gviz/tq?tqx=out:csv&sheet=" + sheet +
+    (tq ? "&tq=" + encodeURIComponent(tq) : "");
+}
+
+var FBS_DATE = "2026-07-27";   // перезаписывается из config!B1
+var SUPPLY_DAYS = 20;          // перезаписывается из config (строка «Срок поставки»)
 var TZ = "Europe/Moscow";
 
 /* ========= УТИЛИТЫ ========= */
@@ -210,7 +330,7 @@ function parseCSV(text){
 }
 function num(s){
   if(s==null) return 0;
-  s=String(s).replace(/ /g,"").replace(/\s/g,"").replace(",",".");
+  s=String(s).replace(/ /g,"").replace(/\s/g,"").replace(",",".");
   var v=parseFloat(s);
   return isNaN(v)?0:v;
 }
@@ -233,21 +353,75 @@ function todayISO(){
   return new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 }
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function bust(u){ return u + (u.indexOf("?")>=0?"&":"?") + "cb=" + Date.now(); }
+function isoDate(s){
+  s=String(s||"").trim();
+  var m=s.match(/(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+"-"+m[2]+"-"+m[3];
+  m=s.match(/(\d{2})\.(\d{2})\.(\d{4})/); if(m) return m[3]+"-"+m[2]+"-"+m[1];
+  return "";
+}
+
+/* ========= КАРТИНКИ WB (алгоритм корзин) ========= */
+var IMG_PLACEHOLDER="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="45"><rect width="34" height="45" rx="6" fill="#e3e2dc"/><path d="M9 30l6-8 5 6 3-4 4 6H9z" fill="#c3c2b7"/><circle cx="13" cy="15" r="3" fill="#c3c2b7"/></svg>');
+var BASKET_T=[[143,1],[287,2],[431,3],[719,4],[1007,5],[1061,6],[1115,7],[1169,8],[1313,9],[1601,10],[1655,11],[1919,12],[2045,13],[2189,14],[2405,15],[2621,16],[2837,17],[3053,18],[3269,19],[3485,20],[3701,21],[3917,22],[4133,23],[4349,24],[4565,25]];
+function wbBasketGuess(vol){
+  for(var i=0;i<BASKET_T.length;i++) if(vol<=BASKET_T[i][0]) return BASKET_T[i][1];
+  if(vol>=9000&&vol<=12500) return 42; // эмпирически: наши nm_id (июль 2026) лежат в basket-42
+  return 26+Math.floor((vol-4566)/312);
+}
+function wbImgData(nm){
+  nm=parseInt(nm,10);
+  if(!nm||isNaN(nm)) return null;
+  var vol=Math.floor(nm/1e5), part=Math.floor(nm/1e3);
+  var b=wbBasketGuess(vol);
+  var cand=[]; [b,b+1,b-1,b+2,b-2,b+3,b-3,42].forEach(function(x){ if(x>=1&&cand.indexOf(x)<0) cand.push(x); });
+  var tpl="https://basket-{B}.wbbasket.ru/vol"+vol+"/part"+part+"/"+nm+"/images/c246x328/1.webp";
+  return {tpl:tpl, cand:cand};
+}
+function pad2(n){ return String(n).length<2? "0"+n : String(n); }
+window.__wbErr=function(img){
+  var c=(img.dataset.c||"").split(",").filter(Boolean);
+  if(!c.length){ img.onerror=null; img.src=IMG_PLACEHOLDER; return; }
+  var b=c.shift(); img.dataset.c=c.join(",");
+  img.src=img.dataset.tpl.replace("{B}",pad2(b));
+};
+function imgHtml(nm, cls){
+  var d=nm? wbImgData(nm):null;
+  if(!d) return '<img class="'+cls+'" src="'+IMG_PLACEHOLDER+'" alt="">';
+  var first=d.cand.shift();
+  return '<img class="'+cls+'" loading="lazy" alt="" data-tpl="'+d.tpl+'" data-c="'+d.cand.join(",")+
+    '" onerror="__wbErr(this)" src="'+d.tpl.replace("{B}",pad2(first))+'">';
+}
+function wbUrl(nm){ return "https://www.wildberries.ru/catalog/"+nm+"/detail.aspx"; }
 
 /* ========= ЗАГРУЗКА ========= */
 var RAW=[];        // {date, sku, orders, ordersRub, cancels, buyouts, buyoutsRub, returns}
 var ANALYSIS=[];   // {date, slice, text}
-var N=7;           // выбранный период
+var CARDS={};      // vendor_code -> {nm, title, category}
+var STOCK={};      // vendor_code -> {nm, date, stocks, toClient, fromClient, returnsPlan, total, buyPct, avgPrice}
+var SEASON={};     // категория -> [12 коэффициентов]
+var SEASON_DEF=[1,1,1,1,1,1,1,1,1,1,1,1];
+var COMMENTS={};   // sku -> {date, text}
+var STOCK_OK=false, STOCK_DATE="";
+var N=7;
 var sortKey="rub", sortDir=-1, searchQ="";
 
-function bust(u){ return u + (u.indexOf("?")>=0?"&":"?") + "cb=" + Date.now(); }
+function fetchText(u){ return fetch(bust(u)).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); }); }
+function tryCSV(u){ return fetchText(u).then(parseCSV).catch(function(){ return null; }); }
 
+var chkFrom=addDays(todayISO(),-10);
 Promise.all([
-  fetch(bust(DATA_CSV_URL)).then(function(r){ if(!r.ok) throw new Error("данные: HTTP "+r.status); return r.text(); }),
-  fetch(bust(ANALYSIS_CSV_URL)).then(function(r){ if(!r.ok) throw new Error("анализ: HTTP "+r.status); return r.text(); })
+  fetchText(DATA_CSV_URL).then(parseCSV),
+  fetchText(ANALYSIS_CSV_URL).then(parseCSV),
+  tryCSV(SPRAV_CSV_URL),
+  tryCSV(SEZON_CSV_URL),
+  tryCSV(COMM_CSV_URL),
+  tryCSV(CONFIG_CSV_URL),
+  tryCSV(gvizUrl("cards","select A,C,D,F")),
+  tryCSV(gvizUrl("checklist","select A,B,BX,CC,CF,CH,CI,CK,DD,DX where A >= date '"+chkFrom+"'"))
 ]).then(function(res){
-  var rows=parseCSV(res[0]);
-  // первые 2 строки — шапка (en-ключи + русские названия)
+  var rows=res[0];
   for(var i=2;i<rows.length;i++){
     var r=rows[i];
     if(!r || !r[0] || !/^\d{4}-\d{2}-\d{2}$/.test(r[0].trim())) continue;
@@ -257,13 +431,20 @@ Promise.all([
       buyouts:num(r[5]), buyoutsRub:num(r[6]), returns:num(r[7])
     });
   }
-  var arows=parseCSV(res[1]);
+  var arows=res[1];
   for(var j=1;j<arows.length;j++){
     var a=arows[j];
     if(!a || !a[0] || !a[2]) continue;
     ANALYSIS.push({date:a[0].trim(), slice:(a[1]||"").trim(), text:a[2]});
   }
   if(!RAW.length) throw new Error("в таблице не нашлось строк с данными");
+
+  parseConfig(res[5]);
+  parseSprav(res[2]);
+  parseCards(res[6]);          // cards поверх Справочника (свежее)
+  parseSeason(res[3]);
+  parseComments(res[4]);
+  parseChecklist(res[7]);
   init();
 }).catch(function(e){
   document.getElementById("status").innerHTML =
@@ -271,9 +452,88 @@ Promise.all([
     '</span><br><span style="font-size:13px">Проверьте, что таблица опубликована в интернете, и обновите страницу.</span>';
 });
 
+function parseConfig(rows){
+  if(!rows) return;
+  rows.forEach(function(r){
+    var k=(r[0]||"").toLowerCase();
+    if(k.indexOf("дата среза")>=0 || k.indexOf("фбс")>=0){ var d=isoDate(r[1]); if(d) FBS_DATE=d; }
+    if(k.indexOf("поставк")>=0){ var v=num(r[1]); if(v>0) SUPPLY_DAYS=Math.round(v); }
+  });
+}
+function parseSprav(rows){
+  if(!rows||rows.length<2) return;
+  for(var i=1;i<rows.length;i++){
+    var r=rows[i], vc=(r[0]||"").trim(), nm=(r[1]||"").trim();
+    if(!vc||!nm) continue;
+    CARDS[vc]={nm:nm, title:(r[2]||"").trim(), category:(r[3]||"").trim()};
+  }
+}
+function parseCards(rows){
+  if(!rows||rows.length<2) return;
+  var h=rows[0].map(function(x){return x.trim();});
+  var iNm=h.indexOf("nm_id"), iT=h.indexOf("title"), iS=h.indexOf("subject_name"), iV=h.indexOf("vendor_code");
+  if(iNm<0) return;
+  for(var i=1;i<rows.length;i++){
+    var r=rows[i], vc=(r[iV]||"").trim(), nm=(r[iNm]||"").trim();
+    if(!vc||!nm) continue;
+    CARDS[vc]={nm:nm, title:(r[iT]||"").trim(), category:(r[iS]||"").trim()};
+  }
+}
+function parseSeason(rows){
+  if(!rows||rows.length<2) return;
+  for(var i=1;i<rows.length;i++){
+    var r=rows[i], name=(r[0]||"").trim();
+    if(!name) continue;
+    var co=[]; for(var m=1;m<=12;m++){ var v=num(r[m]); co.push(v>0? v:1); }
+    if(name.toLowerCase().indexOf("по умолчанию")>=0) SEASON_DEF=co;
+    else SEASON[name]=co;
+  }
+}
+function parseComments(rows){
+  if(!rows||rows.length<2) return;
+  for(var i=1;i<rows.length;i++){
+    var r=rows[i], d=isoDate(r[0]), sku=(r[1]||"").trim(), t=(r[2]||"").trim();
+    if(!sku||!t) continue;
+    if(!COMMENTS[sku] || d>=COMMENTS[sku].date) COMMENTS[sku]={date:d, text:t};
+  }
+}
+function parseChecklist(rows){
+  if(!rows||rows.length<2) return;
+  var h=rows[0].map(function(x){return x.trim();});
+  function ix(n){ return h.indexOf(n); }
+  var iD=ix("date"), iNm=ix("nm_id"), iBuy=ix("buyout_percent"), iPr=ix("avg_price"),
+      iSt=ix("stocks"), iTo=ix("in_way_to_client"), iFr=ix("in_way_from_client"),
+      iRp=ix("returns_plan"), iBm=ix("buyout_percent_month"), iTot=ix("stocks_total");
+  if(iD<0||iNm<0) return;
+  var byNm={};
+  for(var i=1;i<rows.length;i++){
+    var r=rows[i], d=isoDate(r[iD]), nm=(r[iNm]||"").trim();
+    if(!d||!nm) continue;
+    if(!byNm[nm] || d>byNm[nm]._d){
+      var buy=iBuy>=0? num(r[iBuy]):0;
+      if(!(buy>0) && iBm>=0) buy=num(r[iBm]);
+      byNm[nm]={
+        _d:d, nm:nm, date:d,
+        stocks:Math.round(iSt>=0? num(r[iSt]):0),
+        toClient:Math.round(iTo>=0? num(r[iTo]):0),
+        fromClient:Math.round(iFr>=0? num(r[iFr]):0),
+        returnsPlan:Math.round(iRp>=0? num(r[iRp]):0),
+        total:Math.round(iTot>=0? num(r[iTot]):0),
+        buyPct:(buy>1? buy : buy*100),   // в checklist доля (0,45) — переводим в %
+        avgPrice:iPr>=0? num(r[iPr]):0
+      };
+    }
+  }
+  var nm2vc={};
+  Object.keys(CARDS).forEach(function(vc){ nm2vc[CARDS[vc].nm]=vc; });
+  Object.keys(byNm).forEach(function(nm){
+    var vc=nm2vc[nm];
+    if(vc){ STOCK[vc]=byNm[nm]; STOCK_OK=true; if(byNm[nm].date>STOCK_DATE) STOCK_DATE=byNm[nm].date; }
+  });
+}
+
 /* ========= РАСЧЁТЫ ========= */
 function periodDates(n){
-  // последний полный день = максимальная дата в данных, исключая сегодня
   var today=todayISO();
   var maxDate="";
   for(var i=0;i<RAW.length;i++){
@@ -300,8 +560,54 @@ function aggregate(dates){
   return {t:t, bySku:bySku, byDay:byDay};
 }
 function pct(cur,prev){
-  if(prev===0) return (cur===0? 0 : null); // null = «новое», базы не было
+  if(prev===0) return (cur===0? 0 : null);
   return (cur-prev)/prev*100;
+}
+function skuAgg(sku, dates){
+  var set={}; dates.forEach(function(d){set[d]=1;});
+  var a={orders:0, ordersRub:0, buyouts:0, returns:0};
+  RAW.forEach(function(r){
+    if(r.sku!==sku||!set[r.date]) return;
+    a.orders+=r.orders; a.ordersRub+=r.ordersRub; a.buyouts+=r.buyouts; a.returns+=r.returns;
+  });
+  return a;
+}
+function skuDailySeries(sku, dates){
+  var m={}; dates.forEach(function(d){m[d]=0;});
+  RAW.forEach(function(r){ if(r.sku===sku && m.hasOwnProperty(r.date)) m[r.date]+=r.orders; });
+  return dates.map(function(d){ return m[d]; });
+}
+function monthCoef(category, iso){
+  var mo=parseInt(iso.slice(5,7),10)-1;
+  var co=(category&&SEASON[category])? SEASON[category] : SEASON_DEF;
+  return co[mo]||1;
+}
+/* Выкуп, доля 0..1: приоритет — checklist платной таблицы, иначе расчёт по нашим данным */
+function buyShare(sku, agg){
+  var st=STOCK[sku];
+  if(st && st.buyPct>0) return Math.min(st.buyPct/100,1);
+  if(agg && agg.orders>0 && agg.buyouts>0) return Math.min(agg.buyouts/agg.orders,1);
+  return 1;
+}
+/* «Хватит дней»: остаток ÷ (заказы/день за 7 полных дней × выкуп × сезонный коэффициент месяца) */
+function daysLeftInfo(sku){
+  var st=STOCK[sku];
+  if(!st) return null;
+  var p7=periodDates(7);
+  var a7=skuAgg(sku,p7.cur);
+  var opd=a7.orders/7;
+  var card=CARDS[sku];
+  var coef=monthCoef(card? card.category:"", todayISO());
+  var buy=buyShare(sku,a7);
+  var total=st.total||st.stocks;
+  if(total<=0) return {days:0, total:total, st:st, opd:opd, buy:buy, coef:coef};
+  if(opd<=0) return {days:Infinity, total:total, st:st, opd:opd, buy:buy, coef:coef};
+  var rate=opd*buy*coef;
+  return {days: rate>0? total/rate : Infinity, total:total, st:st, opd:opd, buy:buy, coef:coef};
+}
+function orderByDate(days){
+  if(days==null||!isFinite(days)) return null;
+  return addDays(todayISO(), Math.floor(days)-SUPPLY_DAYS);
 }
 
 /* ========= РЕНДЕР ========= */
@@ -313,6 +619,9 @@ function init(){
   var b=document.getElementById("fbsBadge");
   b.textContent="ФБС с "+dShort(FBS_DATE);
   b.style.display="inline-block";
+  document.getElementById("stockNote").textContent = STOCK_OK
+    ? "остатки из 10X WB на "+dRu(STOCK_DATE)+" · срок поставки "+SUPPLY_DAYS+" дн."
+    : "остатки недоступны (платная таблица не ответила)";
 
   document.getElementById("periods").addEventListener("click",function(e){
     var btn=e.target.closest(".pbtn"); if(!btn) return;
@@ -323,6 +632,13 @@ function init(){
   document.getElementById("search").addEventListener("input",function(e){
     searchQ=e.target.value.trim().toLowerCase(); renderTable();
   });
+  document.getElementById("tbody").addEventListener("click",function(e){
+    var btn=e.target.closest(".fbtn"); if(!btn) return;
+    openPanel(btn.dataset.sku);
+  });
+  document.getElementById("ovl").addEventListener("click",closePanel);
+  document.getElementById("spClose").addEventListener("click",closePanel);
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape") closePanel(); });
 
   document.getElementById("status").style.display="none";
   document.getElementById("app").style.display="block";
@@ -387,13 +703,11 @@ function renderChart(){
   var bw=iw/days.length;
   var barW=Math.max(2,Math.min(38,bw*0.68));
   var html="";
-  // сетка: 4 горизонтальные линии
   for(var g=0;g<=4;g++){
     var y=padT+ih-ih*g/4, lab=Math.round(max*g/4);
     html+='<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="#e1e0d9" stroke-width="1"/>';
     html+='<text x="'+(padL-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" fill="#898781">'+lab.toLocaleString("ru-RU")+'</text>';
   }
-  // бары
   days.forEach(function(d,i){
     var v=vals[i].orders;
     var h=Math.max(v>0?2:0, ih*v/max);
@@ -404,19 +718,16 @@ function renderChart(){
       '" height="'+h.toFixed(1)+'" rx="3" fill="'+(isPrev?"#9ec5f4":"#2a78d6")+'"'+
       (isPrev?' fill-opacity="0.75"':"")+'/>';
   });
-  // подписи оси X (не чаще, чем помещается)
   var step=Math.ceil(days.length/ (W<520? 6 : 12));
   days.forEach(function(d,i){
     if(i%step!==0 && i!==days.length-1) return;
     var x=padL+bw*i+bw/2;
     html+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="11" fill="#898781">'+dShort(d)+'</text>';
   });
-  // граница периодов
   if(days.length>2){
     var xb=padL+bw*N;
     html+='<line x1="'+xb+'" y1="'+padT+'" x2="'+xb+'" y2="'+(padT+ih)+'" stroke="#c3c2b7" stroke-width="1" stroke-dasharray="2 3"/>';
   }
-  // линия ФБС
   var fi=days.indexOf(FBS_DATE);
   if(fi>=0){
     var xf=padL+bw*fi+bw/2;
@@ -427,7 +738,6 @@ function renderChart(){
   svg.setAttribute("height",H);
   svg.innerHTML=html;
 
-  // тултип
   var tip=document.getElementById("tip"), box=document.getElementById("chartBox");
   svg.onmousemove=function(e){
     var t=e.target;
@@ -449,38 +759,79 @@ function renderChart(){
 }
 
 var COLS=[
-  {k:"sku",  t:"Артикул",     num:false},
+  {k:"sku",  t:"Товар",       num:false},
   {k:"orders",t:"Заказы, шт", num:true},
   {k:"opd",  t:"Заказы/день", num:true},
   {k:"rub",  t:"Выручка",     num:true},
   {k:"dyn",  t:"Динамика, %", num:true},
   {k:"buy",  t:"Выкуп, %",    num:true},
-  {k:"rpd",  t:"Возвр./день", num:true}
+  {k:"rpd",  t:"Возвр./день", num:true},
+  {k:"stock",t:"Остаток",     num:true},
+  {k:"days", t:"Хватит дней", num:true},
+  {k:"ordBy",t:"Заказать до", num:true},
+  {k:"fc",   t:"",            num:false}
 ];
 function buildRows(){
   var rows=[];
   var skus={};
   Object.keys(CUR.bySku).forEach(function(s){skus[s]=1;});
   Object.keys(PREV.bySku).forEach(function(s){skus[s]=1;});
+  Object.keys(STOCK).forEach(function(s){skus[s]=1;});
   Object.keys(skus).forEach(function(s){
     var c=CUR.bySku[s]||{orders:0,ordersRub:0,buyouts:0,returns:0};
     var p=PREV.bySku[s]||{orders:0,ordersRub:0,buyouts:0,returns:0};
-    if(c.orders===0 && c.ordersRub===0 && p.orders===0 && c.returns===0) return; // пусто в обоих периодах
+    var st=STOCK[s];
+    if(c.orders===0 && c.ordersRub===0 && p.orders===0 && c.returns===0 && !st) return;
+    var dl=daysLeftInfo(s);
+    var card=CARDS[s];
+    var buyPct=null;
+    if(st && st.buyPct>0) buyPct=st.buyPct;
+    else if(c.orders) buyPct=c.buyouts/c.orders*100;
     rows.push({
-      sku:s, orders:c.orders, opd:c.orders/N, rub:c.ordersRub,
-      dyn:pct(c.orders,p.orders), buy:(c.orders? c.buyouts/c.orders*100 : null),
-      rpd:c.returns/N, dead:(c.orders===0 && p.orders>0), prevOrders:p.orders
+      sku:s, card:card||null,
+      orders:c.orders, opd:c.orders/N, rub:c.ordersRub,
+      dyn:pct(c.orders,p.orders), buy:buyPct, buySrc:(st&&st.buyPct>0)?"10X":"расчёт",
+      rpd:c.returns/N, dead:(c.orders===0 && p.orders>0), prevOrders:p.orders,
+      stock:st? (st.total||st.stocks) : null, st:st||null,
+      days:dl? (isFinite(dl.days)? dl.days : 9999) : null,
+      ordBy:dl? orderByDate(dl.days) : null
     });
   });
   return rows;
 }
+function daysCell(r){
+  if(r.days==null) return '<span class="dz gray">—</span>';
+  if(r.days>=9999) return '<span class="dz green" title="заказов не было — расход нулевой">∞</span>';
+  var cls=r.days<14? "red" : (r.days<=30? "orange":"green");
+  return '<span class="dz '+cls+'">'+fmtInt(r.days)+'</span>';
+}
+function ordByCell(r){
+  if(r.days==null||r.days>=9999||!r.ordBy) return '<span style="color:#898781">—</span>';
+  var late=r.ordBy<=todayISO();
+  return '<span class="orderby'+(late?' late':'')+'" title="дата исчерпания минус срок поставки '+SUPPLY_DAYS+' дн.">'+
+    (late? "уже пора" : dShort(r.ordBy)+"."+r.ordBy.slice(0,4))+'</span>';
+}
+function prodCell(r){
+  var c=r.card;
+  var img=imgHtml(c? c.nm:null,"pimg");
+  var name=c&&c.title? c.title : r.sku;
+  var link=c? '<a class="pname" href="'+wbUrl(c.nm)+'" target="_blank" rel="noopener" title="'+esc(name)+'">'+esc(name)+'</a>'
+            : '<span class="pname">'+esc(name)+'</span>';
+  var meta=esc(r.sku)+(c? ' · WB '+esc(c.nm):'')+(r.dead? " ⚠":"");
+  return '<div class="prod">'+img+'<div class="pinfo">'+link+'<div class="pmeta" title="'+meta+'">'+meta+'</div></div></div>';
+}
 function renderTable(){
   var rows=buildRows();
-  if(searchQ) rows=rows.filter(function(r){ return r.sku.toLowerCase().indexOf(searchQ)>=0; });
+  if(searchQ) rows=rows.filter(function(r){
+    var t=(r.card&&r.card.title||"").toLowerCase();
+    var nm=(r.card&&r.card.nm||"");
+    return r.sku.toLowerCase().indexOf(searchQ)>=0 || t.indexOf(searchQ)>=0 || nm.indexOf(searchQ)>=0;
+  });
   rows.sort(function(a,b){
     var A=a[sortKey], B=b[sortKey];
     if(sortKey==="sku") return sortDir*String(A).localeCompare(String(B),"ru");
-    if(A===null) A=-Infinity; if(B===null) B=-Infinity;
+    if(sortKey==="ordBy"){ A=A||"9999"; B=B||"9999"; return sortDir*String(A).localeCompare(String(B)); }
+    if(A===null||A===undefined) A=-Infinity; if(B===null||B===undefined) B=-Infinity;
     return sortDir*(A-B);
   });
   var th="";
@@ -498,23 +849,30 @@ function renderTable(){
       dynCell=(r.dyn>0?"+":"")+r.dyn.toLocaleString("ru-RU",{maximumFractionDigits:0})+"%";
     }
     var buyCell = r.buy===null? '<span style="color:#898781">—</span>'
-      : (r.buy<40? '<span class="wmark">'+fmt1(r.buy)+'</span>' : fmt1(r.buy));
+      : '<span title="источник: '+r.buySrc+'">'+(r.buy<40? '<span class="wmark">'+fmt1(r.buy)+'</span>' : fmt1(r.buy))+'</span>';
     var rpdCell = r.rpd>2? '<span class="wmark">'+fmt1(r.rpd)+'</span>'
       : (r.rpd>0? fmt1(r.rpd) : '<span style="color:#898781">0</span>');
+    var stCell = r.stock===null? '<span style="color:#898781">—</span>'
+      : '<span title="'+(r.st? 'в пути к клиенту: '+r.st.toClient+' · от клиента: '+r.st.fromClient+' · возвраты план: '+r.st.returnsPlan:'')+'">'+fmtInt(r.stock)+'</span>';
     tb+='<tr'+(r.dead?' class="dead" title="Заказы упали до нуля при базе '+r.prevOrders+' шт за прошлый период"':"")+'>'+
-      '<td>'+esc(r.sku)+(r.dead?" ⚠":"")+'</td>'+
+      '<td>'+prodCell(r)+'</td>'+
       '<td>'+fmtInt(r.orders)+'</td>'+
       '<td>'+fmt1(r.opd)+'</td>'+
       '<td>'+fmtMoney(r.rub)+'</td>'+
       '<td class="'+dynCls+'">'+dynCell+'</td>'+
       '<td>'+buyCell+'</td>'+
-      '<td>'+rpdCell+'</td></tr>';
+      '<td>'+rpdCell+'</td>'+
+      '<td>'+stCell+'</td>'+
+      '<td>'+daysCell(r)+'</td>'+
+      '<td>'+ordByCell(r)+'</td>'+
+      '<td><button class="fbtn" data-sku="'+esc(r.sku)+'">Прогноз</button></td></tr>';
   });
-  document.getElementById("tbody").innerHTML=tb || '<tr><td colspan="7" style="text-align:center;color:#898781">ничего не найдено</td></tr>';
+  document.getElementById("tbody").innerHTML=tb || '<tr><td colspan="11" style="text-align:center;color:#898781">ничего не найдено</td></tr>';
   document.getElementById("rowcount").textContent=rows.length+" товаров";
   document.getElementById("thead").onclick=function(e){
     var t=e.target.closest("th"); if(!t) return;
     var k=t.dataset.k;
+    if(k==="fc") return;
     if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=(k==="sku"?1:-1); }
     renderTable();
   };
@@ -528,7 +886,239 @@ function renderClaude(){
   document.getElementById("claudeText").textContent=last.text;
 }
 
-window.addEventListener("resize",function(){ if(RAW.length && document.getElementById("app").style.display!=="none") renderChart(); });
+/* ========= ПАНЕЛЬ ПРОГНОЗА ========= */
+var SP=null; // состояние открытой панели
+function stdev(arr){
+  if(arr.length<2) return 0;
+  var m=arr.reduce(function(a,b){return a+b;},0)/arr.length;
+  var v=arr.reduce(function(a,b){return a+(b-m)*(b-m);},0)/(arr.length-1);
+  return Math.sqrt(v);
+}
+function openPanel(sku){
+  var p7=periodDates(7);
+  var a7=skuAgg(sku,p7.cur), aPrev=skuAgg(sku,p7.prev);
+  var last=p7.last;
+  var histDates=[]; for(var i=59;i>=0;i--) histDates.push(addDays(last,-i));
+  var series=skuDailySeries(sku,histDates);
+  var st=STOCK[sku]||null, card=CARDS[sku]||null;
+  var dl=daysLeftInfo(sku);
+  var base=a7.orders/7;
+  var buy=buyShare(sku,a7)*100;
+  var price=a7.orders>0? a7.ordersRub/a7.orders : (st&&st.avgPrice||0);
+  var sigma=stdev(series.slice(-21));
+  SP={
+    sku:sku, card:card, st:st, dl:dl,
+    histDates:histDates, series:series, last:last,
+    base:base, prevBase:aPrev.orders/7, returns:a7.returns/7,
+    init:{orders:+base.toFixed(1), buy:Math.round(buy), price:Math.round(price)},
+    sim:{orders:+base.toFixed(1), buy:Math.round(buy), price:Math.round(price)},
+    sigma:sigma
+  };
+  // шапка
+  var nm=card? card.nm:null;
+  var imgEl=document.getElementById("spImg");
+  if(nm){ var d=wbImgData(nm); var f=d.cand.shift();
+    imgEl.dataset.tpl=d.tpl; imgEl.dataset.c=d.cand.join(",");
+    imgEl.onerror=function(){__wbErr(imgEl);};
+    imgEl.src=d.tpl.replace("{B}",pad2(f));
+  } else { imgEl.onerror=null; imgEl.src=IMG_PLACEHOLDER; }
+  var nameA=document.getElementById("spName");
+  nameA.textContent=card&&card.title? card.title : sku;
+  if(nm){ nameA.href=wbUrl(nm); nameA.style.pointerEvents=""; } else { nameA.removeAttribute("href"); }
+  document.getElementById("spMeta").textContent=sku+(nm? " · WB "+nm:"")+(card&&card.category? " · "+card.category:"");
+  // ползунки
+  var so=document.getElementById("slOrders"), sb=document.getElementById("slBuy"), sp=document.getElementById("slPrice");
+  so.max=Math.max(10, Math.ceil(SP.base*3)); so.value=SP.sim.orders;
+  sb.value=SP.sim.buy;
+  sp.max=Math.max(1000, Math.ceil(SP.init.price*2/10)*10); sp.value=SP.sim.price;
+  so.oninput=function(){ SP.sim.orders=+so.value; updatePanel(); };
+  sb.oninput=function(){ SP.sim.buy=+sb.value; updatePanel(); };
+  sp.oninput=function(){ SP.sim.price=+sp.value; updatePanel(); };
+  document.getElementById("slReset").onclick=function(){
+    SP.sim={orders:SP.init.orders, buy:SP.init.buy, price:SP.init.price};
+    so.value=SP.sim.orders; sb.value=SP.sim.buy; sp.value=SP.sim.price;
+    updatePanel();
+  };
+  renderComment(sku);
+  updatePanel();
+  document.getElementById("ovl").classList.add("open");
+  var pn=document.getElementById("spanel");
+  pn.classList.add("open"); pn.setAttribute("aria-hidden","false");
+}
+function closePanel(){
+  document.getElementById("ovl").classList.remove("open");
+  var pn=document.getElementById("spanel");
+  pn.classList.remove("open"); pn.setAttribute("aria-hidden","true");
+  SP=null;
+}
+/* прогноз: коридор из колебаний последних 2–3 недель + сезонность месяцев */
+function forecast(sim){
+  var cat=SP.card? SP.card.category:"";
+  var m0=monthCoef(cat,todayISO());
+  var out={central:[], lo:[], hi:[], depl:{c:null, lo:null, hi:null}};
+  var total=SP.st? (SP.st.total||SP.st.stocks):null;
+  var cum={c:0, lo:0, hi:0};
+  var buy=Math.max(sim.buy/100, 0.01);
+  var relSigma=SP.base>0? SP.sigma/SP.base : 0;
+  var sHi=sim.orders*(1+relSigma), sLo=Math.max(0,sim.orders*(1-relSigma));
+  for(var t=1;t<=365;t++){
+    var dte=addDays(SP.last,t);
+    var adj=monthCoef(cat,dte)/(m0||1);
+    var c=sim.orders*adj, lo=sLo*adj, hi=sHi*adj;
+    if(t<=30){ out.central.push(c); out.lo.push(lo); out.hi.push(hi); }
+    if(total!=null&&total>0){
+      cum.c+=c*buy; cum.lo+=lo*buy; cum.hi+=hi*buy;
+      if(out.depl.c===null && cum.c>=total) out.depl.c=dte;
+      if(out.depl.hi===null && cum.hi>=total) out.depl.hi=dte;   // оптимистичные продажи → раньше кончится
+      if(out.depl.lo===null && cum.lo>=total) out.depl.lo=dte;
+    }
+  }
+  return out;
+}
+function updatePanel(){
+  if(!SP) return;
+  var sim=SP.sim;
+  var fc=forecast(sim);
+  var total=SP.st? (SP.st.total||SP.st.stocks):null;
+  // хватит дней при симуляции
+  var cat=SP.card? SP.card.category:"";
+  var coef=monthCoef(cat,todayISO());
+  var rate=sim.orders*(sim.buy/100)*coef;
+  var days=(total!=null&&total>0)? (rate>0? total/rate : Infinity) : null;
+  var ordBy=days!=null&&isFinite(days)? orderByDate(days):null;
+  // карточки
+  var dOpd=pct(sim.orders,SP.prevBase);
+  var cardsHtml=
+    scard("Заказы / день", fmt1(sim.orders)+" <small>шт</small>",
+      "неделю назад: "+fmt1(SP.prevBase)+(dOpd!==null? " ("+(dOpd>0?"+":"")+Math.round(dOpd)+"%)":"")) +
+    scard("Выкуп", sim.buy+" <small>%</small>", SP.st&&SP.st.buyPct>0? "из 10X WB":"расчётный") +
+    scard("Возвраты / день", fmt1(SP.returns)+" <small>шт</small>","за 7 дней") +
+    scard("Остаток итого", total!=null? fmtInt(total):"—",
+      SP.st? "к клиенту: "+SP.st.toClient+" · от клиента: "+SP.st.fromClient : "нет данных 10X") +
+    scard("Хватит дней", days==null? "—" : (isFinite(days)? fmtInt(days):"∞"),
+      "сезонный коэф. "+coef.toLocaleString("ru-RU",{maximumFractionDigits:2})) +
+    scard("Выручка / месяц ≈", fmtMoneyShort(sim.orders*30*sim.price), "заказы × 30 × цена");
+  document.getElementById("spCards").innerHTML=cardsHtml;
+  // вывод
+  var v;
+  if(total==null) v="По этому товару нет данных об остатках в платной таблице 10X WB.";
+  else if(total<=0) v="<b>Остатка нет</b> — товар уже не продаётся со склада. Поставку нужно было заказать раньше.";
+  else if(!isFinite(days)) v="Заказов нет — при нулевом расходе остатка ("+fmtInt(total)+" шт) хватит надолго.";
+  else{
+    var d1=fc.depl.c? dRu(fc.depl.c) : "больше чем через год";
+    var rng=(fc.depl.hi&&fc.depl.lo)? " (коридор: "+dShort(fc.depl.hi)+" – "+dShort(fc.depl.lo)+")"
+          : (fc.depl.hi? " (не раньше "+dShort(fc.depl.hi)+")":"");
+    v="Остатка хватит до <b>~"+d1+"</b>"+rng+".";
+    if(ordBy) v+=" Поставку заказать до <b>~"+dRu(ordBy)+"</b>"+(ordBy<=todayISO()? " — <b style='color:#d03b3b'>уже пора!</b>":".");
+  }
+  document.getElementById("spVerdict").innerHTML=v;
+  // значения ползунков
+  document.getElementById("slOrdersV").textContent=fmt1(sim.orders)+" шт";
+  document.getElementById("slBuyV").textContent=sim.buy+" %";
+  document.getElementById("slPriceV").textContent=fmtInt(sim.price)+" ₽";
+  renderFChart(fc);
+}
+function scard(lbl,val,sub){
+  return '<div class="scard"><div class="lbl">'+lbl+'</div><div class="val">'+val+'</div><div class="sub2">'+sub+'</div></div>';
+}
+function renderFChart(fc){
+  var svg=document.getElementById("fchart");
+  var W=Math.max(svg.parentNode.clientWidth||640,320), H=240;
+  var padL=40,padR=10,padT=12,padB=24;
+  var iw=W-padL-padR, ih=H-padT-padB;
+  var hist=SP.series, nH=hist.length, nF=fc.central.length, nAll=nH+nF;
+  var maxV=1;
+  hist.forEach(function(v){ if(v>maxV) maxV=v; });
+  fc.hi.forEach(function(v){ if(v>maxV) maxV=v; });
+  maxV=Math.ceil(maxV*1.15);
+  var bw=iw/nAll;
+  function X(i){ return padL+bw*i+bw/2; }
+  function Y(v){ return padT+ih-ih*v/maxV; }
+  var html="";
+  for(var g=0;g<=4;g++){
+    var y=padT+ih-ih*g/4, lab=Math.round(maxV*g/4);
+    html+='<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="#e1e0d9"/>';
+    html+='<text x="'+(padL-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="10.5" fill="#898781">'+lab+'</text>';
+  }
+  // бары истории
+  var barW=Math.max(1.5,Math.min(10,bw*0.7));
+  hist.forEach(function(v,i){
+    var h=Math.max(v>0?1.5:0, ih*v/maxV);
+    html+='<rect x="'+(X(i)-barW/2).toFixed(1)+'" y="'+(padT+ih-h).toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="1.5" fill="#b9d4f3"/>';
+  });
+  // сглаженная линия (среднее 7 дней)
+  var ma=[]; for(var i=0;i<nH;i++){ var s=0,c=0; for(var k=Math.max(0,i-6);k<=i;k++){s+=hist[k];c++;} ma.push(s/c); }
+  var d1="";
+  ma.forEach(function(v,i){ d1+=(i?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1)+" "; });
+  html+='<path d="'+d1+'" fill="none" stroke="#2a78d6" stroke-width="2"/>';
+  // коридор прогноза
+  var band="";
+  fc.hi.forEach(function(v,i){ band+=(i?"L":"M")+X(nH+i).toFixed(1)+" "+Y(v).toFixed(1)+" "; });
+  for(var j=fc.lo.length-1;j>=0;j--){ band+="L"+X(nH+j).toFixed(1)+" "+Y(fc.lo[j]).toFixed(1)+" "; }
+  html+='<path d="'+band+' Z" fill="#2a78d6" fill-opacity="0.13" stroke="none"/>';
+  var d2="M"+X(nH-1).toFixed(1)+" "+Y(ma[nH-1]).toFixed(1)+" ";
+  fc.central.forEach(function(v,i){ d2+="L"+X(nH+i).toFixed(1)+" "+Y(v).toFixed(1)+" "; });
+  html+='<path d="'+d2+'" fill="none" stroke="#2a78d6" stroke-width="2" stroke-dasharray="5 4"/>';
+  // граница истории/прогноза
+  var xb=padL+bw*nH;
+  html+='<line x1="'+xb+'" y1="'+padT+'" x2="'+xb+'" y2="'+(padT+ih)+'" stroke="#c3c2b7" stroke-dasharray="2 3"/>';
+  html+='<text x="'+(xb+4)+'" y="'+(padT+9)+'" font-size="10.5" fill="#898781">прогноз</text>';
+  // линия ФБС
+  var fi=SP.histDates.indexOf(FBS_DATE);
+  if(fi>=0){
+    var xf=X(fi);
+    html+='<line x1="'+xf+'" y1="'+(padT-2)+'" x2="'+xf+'" y2="'+(padT+ih)+'" stroke="#d03b3b" stroke-width="1.5" stroke-dasharray="5 4"/>';
+    html+='<text x="'+(xf+4)+'" y="'+(padT+9)+'" font-size="10.5" font-weight="600" fill="#d03b3b">ФБС</text>';
+  }
+  // подписи X
+  var allDates=SP.histDates.concat(fc.central.map(function(_,i){return addDays(SP.last,i+1);}));
+  var step=Math.ceil(nAll/(W<560? 6:10));
+  for(var q=0;q<nAll;q+=step){
+    html+='<text x="'+X(q).toFixed(1)+'" y="'+(H-7)+'" text-anchor="middle" font-size="10.5" fill="#898781">'+dShort(allDates[q])+'</text>';
+  }
+  svg.setAttribute("viewBox","0 0 "+W+" "+H);
+  svg.setAttribute("height",H);
+  svg.innerHTML=html;
+  document.getElementById("fLegend").innerHTML=
+    '<span><span class="sw" style="background:#b9d4f3"></span>заказы по дням</span>'+
+    '<span><span class="sw" style="background:#2a78d6"></span>среднее 7 дней / прогноз</span>'+
+    '<span><span class="sw" style="background:#2a78d6;opacity:.2"></span>коридор пессимист–оптимист</span>'+
+    (SP.histDates.indexOf(FBS_DATE)>=0?'<span><span class="sw" style="background:#d03b3b"></span>переход на ФБС</span>':"");
+}
+function renderComment(sku){
+  var cm=COMMENTS[sku];
+  var dEl=document.getElementById("spCommDate"), tEl=document.getElementById("spCommText");
+  if(cm&&cm.text){
+    dEl.textContent=cm.date? dRu(cm.date):"";
+    tEl.textContent=cm.text; tEl.classList.remove("auto");
+    return;
+  }
+  // автокомментарий по правилам
+  var p7=periodDates(7);
+  var a7=skuAgg(sku,p7.cur), ap=skuAgg(sku,p7.prev);
+  var st=STOCK[sku], dl=daysLeftInfo(sku);
+  var parts=[];
+  var d=pct(a7.orders,ap.orders);
+  if(d===null&&a7.orders>0) parts.push("новый товар в продаже");
+  else if(d!==null&&d<=-30) parts.push("заказы упали на "+Math.abs(Math.round(d))+"% за неделю — проверить цену, остатки и рекламу");
+  else if(d!==null&&d>=30) parts.push("заказы выросли на "+Math.round(d)+"% за неделю");
+  var buy=buyShare(sku,a7)*100;
+  if(a7.orders>0&&buy<40) parts.push("выкуп низкий ("+Math.round(buy)+"%) — много отказов, посмотреть причины возвратов");
+  if(dl&&dl.days!=null&&isFinite(dl.days)){
+    if(dl.days<14) parts.push("остатка меньше 2 недель (~"+Math.round(dl.days)+" дн.) — пора заказывать поставку");
+    else if(dl.days<=30) parts.push("остатка ~"+Math.round(dl.days)+" дн. — планировать поставку");
+  }
+  if(st&&(st.total||st.stocks)<=0) parts.push("остаток нулевой — продажи остановятся");
+  if(a7.returns/7>2) parts.push("много возвратов ("+fmt1(a7.returns/7)+"/день)");
+  if(!parts.length) parts.push("продажи стабильны, аномалий не видно");
+  dEl.textContent="автокомментарий (в листе «Комментарии» записи по товару нет)";
+  tEl.textContent=parts.join("; ")+".";
+  tEl.classList.add("auto");
+}
+
+window.addEventListener("resize",function(){
+  if(RAW.length && document.getElementById("app").style.display!=="none"){ renderChart(); if(SP) updatePanel(); }
+});
 </script>
 </body>
 </html>
