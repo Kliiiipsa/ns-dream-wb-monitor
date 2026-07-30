@@ -210,6 +210,7 @@
     <h1>NS dream — мониторинг Wildberries</h1>
     <span id="fbsBadge" class="badge" style="display:none"></span>
     <span class="sub" id="updated"></span>
+    <button class="pbtn" id="reloadBtn" style="margin-left:auto;padding:6px 14px" title="Перечитать данные из таблиц">⟳ Обновить данные</button>
   </header>
 
   <div id="status"><span class="spin"></span>Загружаю данные из таблиц…</div>
@@ -449,6 +450,11 @@ Promise.all([
   parseSeason(res[3]);
   parseComments(res[4]);
   parseChecklist(res[7]);
+  // показываем только товары нового кабинета (есть в cards/Справочнике)
+  if(Object.keys(CARDS).length){
+    RAW=RAW.filter(function(r){ return CARDS[r.sku]; });
+    if(!RAW.length) throw new Error("нет пересечения данных с новым кабинетом");
+  }
   init();
 }).catch(function(e){
   document.getElementById("status").innerHTML =
@@ -643,6 +649,7 @@ function init(){
     var tr=e.target.closest("tr[data-sku]");
     if(tr) openPanel(tr.dataset.sku);
   });
+  document.getElementById("reloadBtn").addEventListener("click",function(){ location.reload(); });
   document.getElementById("ovl").addEventListener("click",closePanel);
   document.getElementById("spClose").addEventListener("click",closePanel);
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") closePanel(); });
