@@ -417,7 +417,7 @@ function fetchText(u){ return fetch(bust(u)).then(function(r){ if(!r.ok) throw n
 function tryCSV(u){ return fetchText(u).then(parseCSV).catch(function(){ return null; }); }
 
 var chkFrom=addDays(todayISO(),-100);
-var CHK_QUERY="select A,B,N,P,BX,CC,CF,CH,CI,CK,CS,DD,DP,DX where A >= date '"+chkFrom+"'";
+var CHK_QUERY="select A,B,BS,BR,BX,CC,CF,CH,CI,CK,CS,DD,DP,DX where A >= date '"+chkFrom+"'";
 Promise.all([
   fetchText(gvizUrl("checklist",CHK_QUERY)).then(parseCSV),
   tryCSV(gvizUrl("cards","select A,C,D,F")),
@@ -502,7 +502,7 @@ function parseDaily(rows){
   if(!rows||rows.length<2) return;
   var h=rows[0].map(function(x){return x.trim();});
   function ix(n){ return h.indexOf(n); }
-  var iD=ix("date"), iNm=ix("nm_id"), iO=ix("orders"), iR=ix("sum_price"),
+  var iD=ix("date"), iNm=ix("nm_id"), iO=ix("orders_count"), iR=ix("orders_sum_rub"),
       iBuy=ix("buyout_percent"), iPr=ix("avg_price"), iSt=ix("stocks"),
       iTo=ix("in_way_to_client"), iFr=ix("in_way_from_client"), iRp=ix("returns_plan"),
       iPf=ix("profit_without_adv"), iBm=ix("buyout_percent_month"),
