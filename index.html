@@ -202,6 +202,26 @@
     vertical-align:-4px; margin-right:8px;
   }
   @keyframes sp{to{transform:rotate(360deg)}}
+  /* нормативы */
+  .sig{display:inline-block; font-size:11.5px; font-weight:600; border-radius:6px; padding:2px 7px; margin:1px 3px 1px 0; white-space:nowrap}
+  .sig.bad{color:var(--down); background:var(--down-bg)}
+  .sig.warn{color:var(--warn); background:var(--warn-bg)}
+  .sig.new{color:var(--accent); background:var(--accent-soft)}
+  .sig.ok{color:var(--up); background:var(--up-bg)}
+  .phase{font-size:13px; color:var(--ink-2); margin:0 0 12px; line-height:1.55}
+  .phase b{color:var(--ink)}
+  .sums{display:grid; grid-template-columns:repeat(auto-fill,minmax(268px,1fr)); gap:10px}
+  .sumrow{display:flex; gap:10px; align-items:flex-start; text-align:left; width:100%; cursor:pointer;
+    background:var(--page); border:1px solid var(--border); border-radius:10px; padding:10px 12px; font:inherit}
+  .sumrow:hover{border-color:var(--baseline)}
+  .sumrow.active{border-color:var(--accent); background:var(--accent-soft)}
+  .sumn{font-size:20px; font-weight:700; line-height:1.1; min-width:34px}
+  .sumn.bad{color:var(--down)} .sumn.warn{color:var(--warn)} .sumn.new{color:var(--accent)} .sumn.ok{color:var(--up)}
+  .sumt{font-size:13px; font-weight:600}
+  .sumrec{font-size:12px; color:var(--muted); margin-top:3px; line-height:1.4}
+  .allok{font-size:13.5px; color:var(--up); font-weight:600}
+  .filthint{font-size:12.5px; color:var(--muted); margin-top:10px}
+  .filthint b{color:var(--accent); cursor:pointer}
 </style>
 </head>
 <body>
@@ -233,6 +253,13 @@
       <div class="legend" id="chartLegend"></div>
     </section>
 
+    <section class="panel" id="normPanel">
+      <h2>Сводка по нормативам <span class="note" id="normNote"></span></h2>
+      <div class="phase" id="phaseLine"></div>
+      <div class="sums" id="sums"></div>
+      <div class="filthint" id="filtHint"></div>
+    </section>
+
     <section class="panel">
       <h2>Товары за период <span class="note" id="stockNote"></span></h2>
       <div class="tbar">
@@ -254,7 +281,8 @@
     </section>
 
     <footer>Заказы, маржа, выкуп, возвраты и остатки подтягиваются из платной таблицы 10X WB (новый кабинет) при каждом открытии страницы; сезонность и комментарии — из таблицы мониторинга.<br>
-    Срок поставки для даты «заказать до» берётся из листа config (по умолчанию 20 дней) — его можно менять в таблице.</footer>
+    Срок поставки для даты «заказать до» берётся из листа config (по умолчанию 20 дней) — его можно менять в таблице.<br>
+    Нормативы (выкуп по сегментам и коридор, критический выкуп, период разгона, запас в днях по фазам сезона) тоже задаются в листе config; средний выкуп ниши — из МПСтатс через лист «Сезонность».</footer>
   </div>
 </div>
 
@@ -313,6 +341,58 @@ function gvizUrl(sheet, tq){
 var FBS_DATE = "2026-07-27";   // перезаписывается из config!B1
 var SUPPLY_DAYS = 20;          // перезаписывается из config (строка «Срок поставки»)
 var TZ = "Europe/Moscow";
+
+/* ========= НОРМАТИВЫ (методика селлера; всё можно переопределить в листе config) =========
+   config: A=ключ, B=значение 1, C=значение 2. Например:
+     выкуп женская | 30 | 4       запас вход в сезон | 35 | 60
+     выкуп детская | 40 | 5       запас в сезоне     | 30 | 35
+     выкуп критический | 20       запас выход из сезона | 20 | 25
+     период разгона | 30          сегмент школьн | детская одежда              */
+var NORM = {
+  seg: {
+    "женская одежда": {mean:30, corr:4},
+    "мужская одежда": {mean:35, corr:5},
+    "детская одежда": {mean:40, corr:5}
+  },
+  segDefault: "женская одежда",
+  segRules: [
+    {kw:"школьн", seg:"детская одежда"},
+    {kw:"подростк", seg:"детская одежда"},
+    {kw:"для девочек", seg:"детская одежда"},
+    {kw:"детск", seg:"детская одежда"},
+    {kw:"мужск", seg:"мужская одежда"}
+  ],
+  critBuy: 20,     // ниже — вероятны дефекты лекал/ткани
+  rampDays: 30,    // период разгона: данных о динамике ещё недостаточно
+  phase: {
+    "вход в сезон":    {min:35, max:60},
+    "в сезоне":        {min:30, max:35},
+    "выход из сезона": {min:20, max:25},
+    "вне сезона":      {min:20, max:25}
+  },
+  /* средний выкуп ниши и оборачиваемость (МПСтатс, снимок 30.07.2026).
+     Обновляется утренней задачей в лист «Сезонность» (колонки «Выкуп рынка, %» / «Оборачиваемость, дн»). */
+  market: {
+    "Брюки":            {buy:34.9, turn:21},
+    "Брюки спортивные": {buy:45.2, turn:28},
+    "Рубашки":          {buy:42.7, turn:21},
+    "Пиджаки":          {buy:26.8, turn:21},
+    "Шорты":            {buy:34.5, turn:12},
+    "Сарафаны":         {buy:29.8, turn:11},
+    "Жилеты":           {buy:30.1, turn:26},
+    "Юбки":             {buy:30.5, turn:16},
+    "Костюмы":          {buy:49.1, turn:14},
+    "Блузки":           {buy:32.8, turn:17}
+  }
+};
+var PHASE_REC = {
+  "вход в сезон":    "запас больше нормы — склад перегружен; меньше — товара не хватит на разгон сезона (недосорт)",
+  "в сезоне":        "если запас больше нормы — снижать цену и увеличивать рекламный бюджет",
+  "выход из сезона": "чем меньше запас, тем лучше; подсорт малыми партиями",
+  "вне сезона":      "спрос ниже среднего — держать минимальный запас, не перезакладываться"
+};
+var BUY_REC = "проверить цену в рынке, отзывы клиентов (товар на доработку), позиционирование карточки";
+var CRIT_REC = "выкуп ниже критического — вероятны дефекты лекал или ткани, товар нужно проверить и отправить на доработку";
 
 /* ========= УТИЛИТЫ ========= */
 function parseCSV(text){
@@ -410,8 +490,10 @@ var SEASON={};     // категория -> [12 коэффициентов]
 var SEASON_DEF=[1,1,1,1,1,1,1,1,1,1,1,1];
 var COMMENTS={};   // sku -> {date, text}
 var STOCK_OK=false, STOCK_DATE="";
+var FIRST={};      // sku -> дата первой продажи (для периода разгона)
+var DATA_MIN="", DATA_MAX="";
 var N=7;
-var sortKey="profit", sortDir=-1, searchQ="";
+var sortKey="profit", sortDir=-1, searchQ="", flagFilter="";
 
 function fetchText(u){ return fetch(bust(u)).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); }); }
 function tryCSV(u){ return fetchText(u).then(parseCSV).catch(function(){ return null; }); }
@@ -445,9 +527,37 @@ Promise.all([
 function parseConfig(rows){
   if(!rows) return;
   rows.forEach(function(r){
-    var k=(r[0]||"").toLowerCase();
+    var k=(r[0]||"").toLowerCase().trim();
+    var v1=num(r[1]), v2=num(r[2]);
     if(k.indexOf("дата среза")>=0 || k.indexOf("фбс")>=0){ var d=isoDate(r[1]); if(d) FBS_DATE=d; }
-    if(k.indexOf("поставк")>=0){ var v=num(r[1]); if(v>0) SUPPLY_DAYS=Math.round(v); }
+    if(k.indexOf("поставк")>=0 && v1>0){ SUPPLY_DAYS=Math.round(v1); }
+    /* нормативы выкупа по сегментам */
+    if(k.indexOf("выкуп")===0){
+      if(k.indexOf("критич")>=0){ if(v1>0) NORM.critBuy=v1; }
+      else{
+        var seg=null;
+        if(k.indexOf("женск")>=0) seg="женская одежда";
+        else if(k.indexOf("мужск")>=0) seg="мужская одежда";
+        else if(k.indexOf("детск")>=0) seg="детская одежда";
+        if(seg&&v1>0) NORM.seg[seg]={mean:v1, corr:v2>0? v2 : NORM.seg[seg].corr};
+      }
+    }
+    if(k.indexOf("разгон")>=0 && v1>0) NORM.rampDays=Math.round(v1);
+    /* нормативы запаса по фазам сезона */
+    if(k.indexOf("запас")===0 && v1>0 && v2>0){
+      var ph=null;
+      if(k.indexOf("вход")>=0) ph="вход в сезон";
+      else if(k.indexOf("выход")>=0) ph="выход из сезона";
+      else if(k.indexOf("вне сезон")>=0) ph="вне сезона";
+      else if(k.indexOf("в сезон")>=0) ph="в сезоне";
+      if(ph) NORM.phase[ph]={min:v1, max:v2};
+    }
+    /* правило сегмента: «сегмент школьн» -> «детская одежда» */
+    if(k.indexOf("сегмент")===0){
+      var kw=k.replace("сегмент","").trim(), sg=(r[1]||"").trim().toLowerCase();
+      if(kw&&NORM.seg[sg]) NORM.segRules.unshift({kw:kw, seg:sg});
+      else if(kw==="по умолчанию"&&NORM.seg[sg]) NORM.segDefault=sg;
+    }
   });
 }
 function parseAnalysis(rows){
@@ -481,12 +591,22 @@ function parseCards(rows){
 }
 function parseSeason(rows){
   if(!rows||rows.length<2) return;
+  var h=rows[0].map(function(x){return (x||"").toLowerCase().trim();});
+  var iBuy=-1, iTurn=-1;
+  for(var c=13;c<h.length;c++){
+    if(iBuy<0 && h[c].indexOf("выкуп")>=0) iBuy=c;
+    if(iTurn<0 && (h[c].indexOf("оборач")>=0||h[c].indexOf("оборот")>=0)) iTurn=c;
+  }
   for(var i=1;i<rows.length;i++){
     var r=rows[i], name=(r[0]||"").trim();
     if(!name) continue;
     var co=[]; for(var m=1;m<=12;m++){ var v=num(r[m]); co.push(v>0? v:1); }
     if(name.toLowerCase().indexOf("по умолчанию")>=0) SEASON_DEF=co;
     else SEASON[name]=co;
+    /* свежий рыночный выкуп ниши из таблицы перекрывает снимок в коде */
+    var mb=iBuy>=0? num(r[iBuy]):0, mt=iTurn>=0? num(r[iTurn]):0;
+    if(mb>0&&mb<=1) mb=mb*100;
+    if(mb>0) NORM.market[name]={buy:mb, turn:mt>0? mt : (NORM.market[name]? NORM.market[name].turn:0)};
   }
 }
 function parseComments(rows){
@@ -526,6 +646,9 @@ function parseDaily(rows){
       returns:iRet>=0? num(r[iRet]):0,
       buyDay:(o>0&&buyPct>0)? buyPct : null
     });
+    if(o>0 && (!FIRST[sku] || d<FIRST[sku])) FIRST[sku]=d;
+    if(!DATA_MIN || d<DATA_MIN) DATA_MIN=d;
+    if(d>DATA_MAX) DATA_MAX=d;
     if(!latest[sku] || d>latest[sku].date){
       latest[sku]={
         nm:nm, date:d,
@@ -604,6 +727,70 @@ function monthCoef(category, iso){
   var co=(category&&SEASON[category])? SEASON[category] : SEASON_DEF;
   return co[mo]||1;
 }
+/* ---------- НОРМАТИВЫ ---------- */
+/* сегмент товара: по ключевым словам в названии/категории, иначе по умолчанию */
+var SEG_CACHE={};
+function segmentOf(sku){
+  if(SEG_CACHE[sku]) return SEG_CACHE[sku];
+  var p=PRODUCTS[sku]||{};
+  var s=((p.title||"")+" "+(p.category||"")).toLowerCase();
+  var seg=NORM.segDefault;
+  for(var i=0;i<NORM.segRules.length;i++){
+    if(s.indexOf(NORM.segRules[i].kw)>=0){ seg=NORM.segRules[i].seg; break; }
+  }
+  return (SEG_CACHE[sku]=seg);
+}
+/* норма выкупа: рынок ниши (МПСтатс) или средний по сегменту; коридор ± от сегмента */
+function buyNorm(sku){
+  var p=PRODUCTS[sku]||{};
+  var seg=segmentOf(sku);
+  var s=NORM.seg[seg]||NORM.seg[NORM.segDefault];
+  var mk=p.category? NORM.market[p.category]:null;
+  var base=(mk&&mk.buy>0)? mk.buy : s.mean;
+  var mkt=!!(mk&&mk.buy>0);
+  return {seg:seg, base:base, corr:s.corr, low:base-s.corr, high:base+s.corr, isMarket:mkt,
+    src: mkt? ("рынок ниши «"+p.category+"»") : ("сегмент «"+seg+"»"),
+    turn: mk? mk.turn : 0};
+}
+function buyStatus(pctv, n){
+  if(pctv==null) return null;
+  if(pctv<NORM.critBuy) return "crit";
+  if(pctv<n.low) return "low";
+  if(pctv>=n.high) return "high";
+  return "ok";
+}
+/* фаза сезона по коэффициентам категории: смотрим 2 месяца вперёд */
+var PHASE_CACHE={};
+function seasonPhase(category){
+  var key=category||"*";
+  if(PHASE_CACHE[key]) return PHASE_CACHE[key];
+  var co=(category&&SEASON[category])? SEASON[category] : SEASON_DEF;
+  var m=parseInt(todayISO().slice(5,7),10)-1;
+  var c0=co[m]||1, n1=co[(m+1)%12]||1, n2=co[(m+2)%12]||1, p1=co[(m+11)%12]||1;
+  var fwd=Math.max(n1,n2)/(c0||1);
+  var name;
+  if(fwd>=1.10) name="вход в сезон";
+  else if(fwd<=0.90) name="выход из сезона";
+  else name=(c0>=1)? "в сезоне" : "вне сезона";
+  var nm=NORM.phase[name]||{min:30,max:35};
+  var res={name:name, c0:c0, next:n1, prev:p1, fwd:fwd, min:nm.min, max:nm.max, rec:PHASE_REC[name]||""};
+  return (PHASE_CACHE[key]=res);
+}
+function phaseOf(sku){ var p=PRODUCTS[sku]; return seasonPhase(p? p.category:""); }
+function daysStatus(days, ph){
+  if(days==null||!isFinite(days)) return null;
+  if(days<ph.min) return "low";
+  if(days>ph.max) return "high";
+  return "ok";
+}
+/* период разгона: товар появился в данных недавно (< NORM.rampDays дней назад) */
+function rampInfo(sku){
+  var f=FIRST[sku];
+  if(!f||!DATA_MAX) return {ramp:false, days:null, first:null};
+  var days=Math.round((Date.parse(DATA_MAX)-Date.parse(f))/864e5)+1;
+  var known=f>addDays(DATA_MIN,2);   // до начала окна данных товар не продавался
+  return {ramp:(known&&days<NORM.rampDays), days:known? days:null, first:f};
+}
 /* Выкуп, доля 0..1: срез из checklist, иначе средневзвешенный за период */
 function buyShare(sku, agg){
   var st=STOCK[sku];
@@ -672,11 +859,72 @@ function init(){
   render();
 }
 
-var CUR, PREV, P;
+var CUR, PREV, P, ROWS=null;
 function render(){
   P=periodDates(N);
   CUR=aggregate(P.cur); PREV=aggregate(P.prev);
-  renderCards(); renderChart(); renderTable();
+  ROWS=buildRows();
+  renderCards(); renderChart(); renderSummary(); renderTable();
+}
+
+/* ========= СВОДКА ПО НОРМАТИВАМ ========= */
+var SUMDEF=[
+  {f:"short",   t:"Запаса мало",        rec:"дефицит: заказать подсорт, иначе продажи встанут"},
+  {f:"zero",    t:"Нулевой остаток",    rec:"товар не продаётся со склада — поставку надо было заказать раньше"},
+  {f:"over",    t:"Склад перегружен",   rec:"запас выше нормы фазы: снижать цену, увеличивать рекламный бюджет"},
+  {f:"buycrit", t:"Выкуп ниже "+"20%",  rec:"вероятны дефекты лекал или ткани — товар на проверку и доработку"},
+  {f:"buylow",  t:"Выкуп ниже нормы",   rec:"проверить цену в рынке, отзывы (на доработку), позиционирование"},
+  {f:"drop",    t:"Заказы упали >30%",  rec:"проверить цену, позицию в выдаче, рекламу и остатки по размерам"},
+  {f:"ramp",    t:"В периоде разгона",  rec:"меньше 30 дней в продаже — выводы по динамике делать рано"}
+];
+function renderSummary(){
+  var rows=ROWS||[];
+  document.getElementById("normNote").textContent =
+    "нормативы: выкуп по нише/сегменту ±коридор, запас по фазе сезона, разгон "+NORM.rampDays+" дн. (меняются в листе config)";
+  /* фазы сезона по категориям, взвешенно по заказам */
+  var byPhase={};
+  rows.forEach(function(r){
+    var cat=(r.prod&&r.prod.category)||"без категории";
+    var p=r.ph.name;
+    var o=byPhase[p]||(byPhase[p]={cats:{}, orders:0, min:r.ph.min, max:r.ph.max});
+    o.cats[cat]=(o.cats[cat]||0)+r.orders; o.orders+=r.orders;
+  });
+  var order=["вход в сезон","в сезоне","выход из сезона","вне сезона"];
+  var ph=order.filter(function(p){return byPhase[p];}).map(function(p){
+    var o=byPhase[p];
+    var cats=Object.keys(o.cats).sort(function(a,b){return o.cats[b]-o.cats[a];}).slice(0,4);
+    return "<b>"+p+"</b> (норма запаса "+o.min+"–"+o.max+" дн.): "+cats.join(", ")+
+      (Object.keys(o.cats).length>4? " и др.":"");
+  });
+  document.getElementById("phaseLine").innerHTML =
+    "Фаза сезона по коэффициентам сезонности: "+ph.join(" · ")+".<br>"+
+    Object.keys(byPhase).map(function(p){return PHASE_REC[p]? "<span style='color:#898781'>"+p+" — "+PHASE_REC[p]+"</span>":"";}).filter(Boolean).join("<br>");
+  /* плитки-счётчики */
+  var html="", any=false;
+  SUMDEF.forEach(function(d){
+    var n=rows.filter(function(r){return r.flags.indexOf(d.f)>=0;}).length;
+    if(!n) return;
+    any=true;
+    var cls=(SIG[d.f]&&SIG[d.f].cls)||"warn";
+    html+='<button class="sumrow'+(flagFilter===d.f? " active":"")+'" data-f="'+d.f+'">'+
+      '<span class="sumn '+cls+'">'+n+'</span><span><span class="sumt">'+d.t+'</span>'+
+      '<div class="sumrec">'+d.rec+'</div></span></button>';
+  });
+  var okN=rows.filter(function(r){return !r.flags.length;}).length;
+  document.getElementById("sums").innerHTML = any? html :
+    '<div class="allok">Все товары в пределах нормативов ('+okN+' шт).</div>';
+  document.getElementById("filtHint").innerHTML = any?
+    ("В норме по всем показателям: "+okN+" из "+rows.length+" товаров. Нажмите плитку — таблица покажет только эти товары"+
+     (flagFilter? ' · <b id="clearFilt">сбросить фильтр</b>':"")) : "";
+  var sums=document.getElementById("sums");
+  sums.onclick=function(e){
+    var b=e.target.closest(".sumrow"); if(!b) return;
+    flagFilter=(flagFilter===b.dataset.f)? "" : b.dataset.f;
+    renderSummary(); renderTable();
+    if(flagFilter) document.getElementById("stockNote").scrollIntoView({behavior:"smooth", block:"center"});
+  };
+  var cf=document.getElementById("clearFilt");
+  if(cf) cf.onclick=function(){ flagFilter=""; renderSummary(); renderTable(); };
 }
 
 function card(lbl,valHtml,delta,invert,cmpText){
@@ -790,6 +1038,7 @@ var COLS=[
   {k:"stock", t:"Остаток",      num:true},
   {k:"days",  t:"Хватит дней",  num:true},
   {k:"ordBy", t:"Заказать до",  num:true},
+  {k:"sig",   t:"Сигналы",      num:false},
   {k:"fc",    t:"",             num:false}
 ];
 function buildRows(){
@@ -807,23 +1056,66 @@ function buildRows(){
     var prod=PRODUCTS[s];
     var b=buyAvg(c);
     if(b==null && st && st.buyPct>0) b=st.buyPct;
+    var ph=phaseOf(s), bn=buyNorm(s), rp=rampInfo(s);
+    var days=dl? (isFinite(dl.days)? dl.days : 9999) : null;
+    var stock=st? (st.total||st.stocks) : null;
+    var bs=buyStatus(b,bn);
+    var ds=(days!=null&&days<9999)? daysStatus(days,ph) : null;
+    var dyn=pct(c.orders,p.orders);
+    var flags=[];
+    if(bs==="crit") flags.push("buycrit");
+    else if(bs==="low") flags.push("buylow");
+    if(stock!=null&&stock<=0) flags.push("zero");
+    else if(!rp.ramp&&ds==="high") flags.push("over");
+    else if(!rp.ramp&&ds==="low") flags.push("short");
+    if(rp.ramp) flags.push("ramp");
+    if(!rp.ramp&&dyn!==null&&dyn<=-30&&p.orders>=5) flags.push("drop");
     rows.push({
       sku:s, prod:prod||null,
       orders:c.orders, profit:c.profit,
-      dyn:pct(c.orders,p.orders), buy:b,
+      dyn:dyn, buy:b,
       ret:c.returns, dead:(c.orders===0 && p.orders>0), prevOrders:p.orders,
-      stock:st? (st.total||st.stocks) : null, st:st||null,
-      days:dl? (isFinite(dl.days)? dl.days : 9999) : null,
-      ordBy:dl? orderByDate(dl.days) : null
+      stock:stock, st:st||null,
+      days:days,
+      ordBy:dl? orderByDate(dl.days) : null,
+      ph:ph, bn:bn, bs:bs, ds:ds, ramp:rp.ramp, rampDays:rp.days, flags:flags
     });
   });
   return rows;
 }
 function daysCell(r){
   if(r.days==null) return '<span class="dz gray">—</span>';
-  if(r.days>=9999) return '<span class="dz green" title="заказов не было — расход нулевой">∞</span>';
-  var cls=r.days<14? "red" : (r.days<=30? "orange":"green");
-  return '<span class="dz '+cls+'">'+fmtInt(r.days)+'</span>';
+  if(r.days>=9999) return '<span class="dz gray" title="заказов нет — расход нулевой">∞</span>';
+  if(r.ramp) return '<span class="dz gray" title="товар в продаже '+r.rampDays+' дн. — расход ещё не устоялся, норму '+r.ph.min+'–'+r.ph.max+' дн. применять рано">'+fmtInt(r.days)+'</span>';
+  var cls=r.ds==="low"? "red" : (r.ds==="high"? "orange":"green");
+  var t="норма "+r.ph.min+"–"+r.ph.max+" дн. ("+r.ph.name+")"+
+    (r.ds==="high"? " · склад перегружен" : (r.ds==="low"? " · запаса мало":" · в норме"));
+  return '<span class="dz '+cls+'" title="'+t+'">'+fmtInt(r.days)+'</span>';
+}
+function buyCell(r){
+  if(r.buy==null) return '<span style="color:#898781">—</span>';
+  var t="норма "+fmt1(r.bn.low)+"–"+fmt1(r.bn.high)+"% · "+r.bn.src+
+    (r.bn.isMarket? " = "+fmt1(r.bn.base)+"%" : "");
+  if(r.bs==="crit") return '<span class="dz red" title="ниже критических '+NORM.critBuy+'% — '+CRIT_REC+'">'+fmt1(r.buy)+'</span>';
+  if(r.bs==="low")  return '<span class="wmark" title="ниже нормы: '+t+'">'+fmt1(r.buy)+'</span>';
+  if(r.bs==="high") return '<span class="dz green" title="выше нормы: '+t+'">'+fmt1(r.buy)+'</span>';
+  return '<span title="'+t+'">'+fmt1(r.buy)+'</span>';
+}
+var SIG={
+  buycrit:{cls:"bad",  t:"дефекты?", tip:"выкуп ниже "+"20"+"% — проверить лекала, ткань, отзывы"},
+  buylow: {cls:"warn", t:"выкуп ↓",  tip:"выкуп ниже нормы ниши"},
+  zero:   {cls:"bad",  t:"нет остатка", tip:"остаток нулевой — продажи остановятся"},
+  over:   {cls:"warn", t:"перегруз", tip:"запас больше нормы фазы сезона"},
+  short:  {cls:"bad",  t:"дефицит",  tip:"запас меньше нормы фазы сезона"},
+  ramp:   {cls:"new",  t:"разгон",   tip:"товар в продаже меньше 30 дней"},
+  drop:   {cls:"bad",  t:"падение",  tip:"заказы упали больше 30% за период"}
+};
+function sigCell(r){
+  if(!r.flags.length) return '<span class="sig ok" title="отклонений от нормативов нет">норма</span>';
+  return r.flags.map(function(f){
+    var s=SIG[f]; if(!s) return "";
+    return '<span class="sig '+s.cls+'" title="'+s.tip+'">'+s.t+'</span>';
+  }).join("");
 }
 function ordByCell(r){
   if(r.days==null||r.days>=9999||!r.ordBy) return '<span style="color:#898781">—</span>';
@@ -841,7 +1133,8 @@ function prodCell(r){
   return '<div class="prod">'+img+'<div class="pinfo">'+link+'<div class="pmeta" title="'+meta+'">'+meta+'</div></div></div>';
 }
 function renderTable(){
-  var rows=buildRows();
+  var rows=(ROWS||buildRows()).slice();
+  if(flagFilter) rows=rows.filter(function(r){ return r.flags.indexOf(flagFilter)>=0; });
   if(searchQ) rows=rows.filter(function(r){
     var t=(r.prod&&r.prod.title||"").toLowerCase();
     var nm=(r.prod&&r.prod.nm||"");
@@ -868,8 +1161,7 @@ function renderTable(){
       if(r.dyn>=20) dynCls="good"; else if(r.dyn<=-20) dynCls="bad";
       dynCell=(r.dyn>0?"+":"")+r.dyn.toLocaleString("ru-RU",{maximumFractionDigits:0})+"%";
     }
-    var buyCell = r.buy==null? '<span style="color:#898781">—</span>'
-      : (r.buy<40? '<span class="wmark">'+fmt1(r.buy)+'</span>' : fmt1(r.buy));
+    if(r.ramp) dynCell='<span class="sig new" title="товар в продаже '+r.rampDays+' дн. — период разгона, данных о динамике ещё недостаточно">разгон '+r.rampDays+' дн.</span>', dynCls="";
     var retCell = r.ret>0? fmtInt(r.ret) : '<span style="color:#898781">0</span>';
     var stCell = r.stock===null? '<span style="color:#898781">—</span>'
       : '<span title="'+(r.st? 'в пути к клиенту: '+r.st.toClient+' · от клиента: '+r.st.fromClient+' · возвраты план: '+r.st.returnsPlan:'')+'">'+fmtInt(r.stock)+'</span>';
@@ -878,19 +1170,21 @@ function renderTable(){
       '<td>'+fmtInt(r.orders)+'</td>'+
       '<td>'+fmtMoney(r.profit)+'</td>'+
       '<td class="'+dynCls+'">'+dynCell+'</td>'+
-      '<td>'+buyCell+'</td>'+
+      '<td>'+buyCell(r)+'</td>'+
       '<td>'+retCell+'</td>'+
       '<td>'+stCell+'</td>'+
       '<td>'+daysCell(r)+'</td>'+
       '<td>'+ordByCell(r)+'</td>'+
+      '<td>'+sigCell(r)+'</td>'+
       '<td><button class="fbtn" data-sku="'+esc(r.sku)+'">Прогноз</button></td></tr>';
   });
-  document.getElementById("tbody").innerHTML=tb || '<tr><td colspan="10" style="text-align:center;color:#898781">ничего не найдено</td></tr>';
-  document.getElementById("rowcount").textContent=rows.length+" товаров";
+  document.getElementById("tbody").innerHTML=tb || '<tr><td colspan="11" style="text-align:center;color:#898781">ничего не найдено</td></tr>';
+  document.getElementById("rowcount").textContent=rows.length+" товаров"+
+    (flagFilter? " · фильтр: "+(SIG[flagFilter]? SIG[flagFilter].t:flagFilter) : "");
   document.getElementById("thead").onclick=function(e){
     var t=e.target.closest("th"); if(!t) return;
     var k=t.dataset.k;
-    if(k==="fc") return;
+    if(k==="fc"||k==="sig") return;
     if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=(k==="sku"?1:-1); }
     renderTable();
   };
@@ -924,8 +1218,9 @@ function openPanel(sku){
   var buy=buyShare(sku,a7)*100;
   var price=a7.orders>0? a7.ordersRub/a7.orders : (st&&st.avgPrice||0);
   var sigma=stdev(series.slice(-21));
+  var rp0=rampInfo(sku);
   SP={
-    sku:sku, prod:prod, st:st, dl:dl,
+    sku:sku, prod:prod, st:st, dl:dl, ramp:rp0.ramp, rampDays:rp0.days,
     histDates:histDates, series:series, last:last,
     base:base, prevBase:aPrev.orders/7, returns:a7.returns/7, profit7:a7.profit,
     init:{orders:+base.toFixed(1), buy:Math.round(buy), price:Math.round(price)},
@@ -998,6 +1293,7 @@ function updatePanel(){
   var total=SP.st? (SP.st.total||SP.st.stocks):null;
   var cat=SP.prod? SP.prod.category:"";
   var coef=monthCoef(cat,todayISO());
+  var ph=phaseOf(SP.sku), bn=buyNorm(SP.sku);
   var rate=sim.orders*(sim.buy/100)*coef;
   var days=(total!=null&&total>0)? (rate>0? total/rate : Infinity) : null;
   var ordBy=days!=null&&isFinite(days)? orderByDate(days):null;
@@ -1005,14 +1301,18 @@ function updatePanel(){
   var cardsHtml=
     scard("Заказы / день", fmt1(sim.orders)+" <small>шт</small>",
       "неделю назад: "+fmt1(SP.prevBase)+(dOpd!==null? " ("+(dOpd>0?"+":"")+Math.round(dOpd)+"%)":"")) +
-    scard("Выкуп", sim.buy+" <small>%</small>", "из 10X WB") +
+    scard("Выкуп", sim.buy+" <small>%</small>",
+      "норма "+fmt1(bn.low)+"–"+fmt1(bn.high)+"% · "+bn.src) +
     scard("Маржа до ДРР (7 дн)", fmtMoneyShort(SP.profit7), "profit_without_adv") +
     scard("Возвраты / день", fmt1(SP.returns)+" <small>шт</small>","за 7 дней") +
     scard("Остаток итого", total!=null? fmtInt(total):"—",
       SP.st? "к клиенту: "+SP.st.toClient+" · от клиента: "+SP.st.fromClient : "нет данных 10X") +
     scard("Хватит дней", days==null? "—" : (isFinite(days)? fmtInt(days):"∞"),
-      "сезонный коэф. "+coef.toLocaleString("ru-RU",{maximumFractionDigits:2})) +
-    scard("Выручка / месяц ≈", fmtMoneyShort(sim.orders*30*sim.price), "заказы × 30 × цена");
+      "норма "+ph.min+"–"+ph.max+" дн. · "+ph.name) +
+    scard("Выручка / месяц ≈", fmtMoneyShort(sim.orders*30*sim.price), "заказы × 30 × цена") +
+    scard("Фаза сезона", ph.name.replace("в сезоне","в сезоне"),
+      "коэф. "+ph.c0.toLocaleString("ru-RU",{maximumFractionDigits:2})+" → "+
+      ph.next.toLocaleString("ru-RU",{maximumFractionDigits:2})+" в след. месяце");
   document.getElementById("spCards").innerHTML=cardsHtml;
   var v;
   if(total==null) v="По этому товару нет данных об остатках в платной таблице 10X WB.";
@@ -1024,6 +1324,13 @@ function updatePanel(){
           : (fc.depl.hi? " (не раньше "+dShort(fc.depl.hi)+")":"");
     v="Остатка хватит до <b>~"+d1+"</b>"+rng+".";
     if(ordBy) v+=" Поставку заказать до <b>~"+dRu(ordBy)+"</b>"+(ordBy<=todayISO()? " — <b style='color:#d03b3b'>уже пора!</b>":".");
+    var dst=SP.ramp? null : daysStatus(days,ph);
+    if(SP.ramp) v+=" Товар в продаже "+SP.rampDays+" дн. (период разгона) — норму запаса "+ph.min+"–"+ph.max+" дн. применять рано.";
+    else if(dst==="high") v+=" Запас <b>"+fmtInt(days)+" дн.</b> при норме "+ph.min+"–"+ph.max+" дн. ("+ph.name+
+      ") — <b style='color:#b96a00'>склад перегружен</b>: "+PHASE_REC[ph.name]+".";
+    else if(dst==="low") v+=" Запас <b>"+fmtInt(days)+" дн.</b> — ниже нормы "+ph.min+"–"+ph.max+" дн. ("+ph.name+
+      "): <b style='color:#d03b3b'>нужен подсорт</b>.";
+    else v+=" Запас "+fmtInt(days)+" дн. — в норме "+ph.min+"–"+ph.max+" дн. для фазы «"+ph.name+"».";
   }
   document.getElementById("spVerdict").innerHTML=v;
   document.getElementById("slOrdersV").textContent=fmt1(sim.orders)+" шт";
@@ -1103,21 +1410,47 @@ function renderComment(sku){
   var p7=periodDates(7);
   var a7=skuAgg(sku,p7.cur), ap=skuAgg(sku,p7.prev);
   var st=STOCK[sku], dl=daysLeftInfo(sku);
+  var ph=phaseOf(sku), bn=buyNorm(sku), rp=rampInfo(sku);
   var parts=[];
-  var d=pct(a7.orders,ap.orders);
-  if(d===null&&a7.orders>0) parts.push("новый товар в продаже");
-  else if(d!==null&&d<=-30) parts.push("заказы упали на "+Math.abs(Math.round(d))+"% за неделю — проверить цену, остатки и рекламу");
-  else if(d!==null&&d>=30) parts.push("заказы выросли на "+Math.round(d)+"% за неделю");
-  var buy=buyShare(sku,a7)*100;
-  if(a7.orders>0&&buy<40) parts.push("выкуп низкий ("+Math.round(buy)+"%) — много отказов, посмотреть причины возвратов");
-  if(dl&&dl.days!=null&&isFinite(dl.days)){
-    if(dl.days<14) parts.push("остатка меньше 2 недель (~"+Math.round(dl.days)+" дн.) — пора заказывать поставку");
-    else if(dl.days<=30) parts.push("остатка ~"+Math.round(dl.days)+" дн. — планировать поставку");
+  /* 1. период разгона — по нему выводы о динамике не делаем */
+  if(rp.ramp) parts.push("товар в продаже "+rp.days+" дн. — период разгона (до "+NORM.rampDays+
+    " дн.), данных о динамике продаж ещё недостаточно: смотреть на выкуп и запас");
+  else{
+    var d=pct(a7.orders,ap.orders);
+    if(d===null&&a7.orders>0) parts.push("заказов на прошлой неделе не было, сравнивать не с чем");
+    else if(d!==null&&d<=-30) parts.push("заказы упали на "+Math.abs(Math.round(d))+
+      "% за неделю — проверить цену в рынке, позицию в выдаче, рекламу и наличие размеров");
+    else if(d!==null&&d>=30) parts.push("заказы выросли на "+Math.round(d)+
+      "% за неделю — проверить, хватит ли запаса на этот темп");
   }
-  if(st&&(st.total||st.stocks)<=0) parts.push("остаток нулевой — продажи остановятся");
-  if(a7.returns/7>2) parts.push("много возвратов ("+fmt1(a7.returns/7)+"/день)");
-  if(!parts.length) parts.push("продажи стабильны, аномалий не видно");
-  dEl.textContent="автокомментарий (в листе «Комментарии» записи по товару нет)";
+  /* 2. выкуп относительно нормы ниши/сегмента */
+  var buy=buyShare(sku,a7)*100;
+  var bst=buyStatus(buy,bn);
+  var normTxt="норма "+fmt1(bn.low)+"–"+fmt1(bn.high)+"% ("+bn.src+
+    (bn.isMarket? ", средний "+fmt1(bn.base)+"%":"")+")";
+  if(bst==="crit") parts.push("выкуп "+fmt1(buy)+"% — ниже критических "+NORM.critBuy+"%: "+CRIT_REC);
+  else if(bst==="low") parts.push("выкуп "+fmt1(buy)+"% ниже нормы ("+normTxt+") — "+BUY_REC);
+  else if(bst==="high") parts.push("выкуп "+fmt1(buy)+"% выше нормы ("+normTxt+") — показатель отличный, товар можно масштабировать");
+  else if(bst==="ok") parts.push("выкуп "+fmt1(buy)+"% в коридоре нормы ("+normTxt+")");
+  /* 3. запас относительно нормы фазы сезона */
+  var total=st? (st.total||st.stocks):null;
+  if(total!=null&&total<=0) parts.push("остаток нулевой — продажи остановятся, нужна поставка");
+  else if(rp.ramp&&dl&&dl.days!=null&&isFinite(dl.days)){
+    parts.push("запаса на "+Math.round(dl.days)+" дн. по текущему темпу, но темп ещё не устоялся — вернуться к оценке запаса после "+NORM.rampDays+" дн. в продаже");
+  }
+  else if(dl&&dl.days!=null&&isFinite(dl.days)){
+    var dst=daysStatus(dl.days,ph);
+    var nrm="норма "+ph.min+"–"+ph.max+" дн. для фазы «"+ph.name+"»";
+    if(dst==="low") parts.push("запас "+Math.round(dl.days)+" дн. — ниже нормы ("+nrm+
+      "): "+(ph.name==="вход в сезон"? "на входе в сезон товара не хватит, был недосорт — срочный подсорт":"пора заказывать поставку"));
+    else if(dst==="high") parts.push("запас "+Math.round(dl.days)+" дн. — выше нормы ("+nrm+
+      "): склад перегружен, "+PHASE_REC[ph.name]);
+    else parts.push("запас "+Math.round(dl.days)+" дн. — в норме ("+nrm+")");
+  }
+  /* 4. возвраты */
+  if(a7.returns/7>2) parts.push("много возвратов ("+fmt1(a7.returns/7)+"/день) — посмотреть причины в отзывах");
+  if(!parts.length) parts.push("продажи стабильны, отклонений от нормативов нет");
+  dEl.textContent="автокомментарий по нормативам (в листе «Комментарии» записи по товару нет)";
   tEl.textContent=parts.join("; ")+".";
   tEl.classList.add("auto");
 }
