@@ -767,9 +767,11 @@ function seasonPhase(category){
   var co=(category&&SEASON[category])? SEASON[category] : SEASON_DEF;
   var m=parseInt(todayISO().slice(5,7),10)-1;
   var c0=co[m]||1, n1=co[(m+1)%12]||1, n2=co[(m+2)%12]||1, p1=co[(m+11)%12]||1;
+  var peak=Math.max.apply(null,co);
   var fwd=Math.max(n1,n2)/(c0||1);
   var name;
-  if(fwd>=1.10) name="вход в сезон";
+  if(c0>=peak*0.95) name="в сезоне";                 /* пик года — самый сезон */
+  else if(fwd>=1.10) name="вход в сезон";
   else if(fwd<=0.90) name="выход из сезона";
   else name=(c0>=1)? "в сезоне" : "вне сезона";
   var nm=NORM.phase[name]||{min:30,max:35};
