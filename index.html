@@ -222,6 +222,28 @@
   .allok{font-size:13.5px; color:var(--up); font-weight:600}
   .filthint{font-size:12.5px; color:var(--muted); margin-top:10px}
   .filthint b{color:var(--accent); cursor:pointer}
+  /* воронка */
+  .fun{display:flex; flex-direction:column; gap:0}
+  .fstep{display:grid; grid-template-columns:150px 1fr 132px; gap:10px; align-items:center; padding:7px 0}
+  @media(max-width:560px){.fstep{grid-template-columns:104px 1fr 96px; gap:7px}}
+  .fstep .fl{font-size:12.5px; color:var(--ink-2); font-weight:600}
+  .fstep .fv{font-size:13.5px; font-weight:700; text-align:right; font-variant-numeric:tabular-nums}
+  .fbar{height:22px; border-radius:6px; background:var(--accent-soft); position:relative; overflow:hidden}
+  .fbar i{position:absolute; left:0; top:0; bottom:0; background:var(--accent); border-radius:6px; display:block}
+  .fconv{display:grid; grid-template-columns:150px 1fr 132px; gap:10px; align-items:center; padding:2px 0 2px}
+  @media(max-width:560px){.fconv{grid-template-columns:104px 1fr 96px; gap:7px}}
+  .fconv .c{grid-column:2 / span 2; font-size:12.5px; color:var(--muted); display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .fconv .c b{font-size:13px; color:var(--ink)}
+  .fconv.bad .c b{color:var(--down)}
+  .fconv.good .c b{color:var(--up)}
+  .fnorm{font-size:12px; color:var(--muted)}
+  .bnbox{background:var(--warn-bg); border-radius:10px; padding:11px 13px; margin-top:10px; font-size:13.5px; line-height:1.5}
+  .bnbox.ok{background:var(--up-bg)}
+  .bnbox b{font-weight:700}
+  .bnlist{margin:7px 0 0; padding-left:18px; font-size:13px; color:var(--ink-2); line-height:1.55}
+  .bnlist li{margin:2px 0}
+  .bncell{font-size:12.5px; font-weight:600}
+  .bncell.bad{color:var(--down)} .bncell.warn{color:var(--warn)} .bncell.gray{color:var(--muted); font-weight:500}
 </style>
 </head>
 <body>
@@ -299,6 +321,11 @@
   </div>
   <div class="sp-body">
     <div class="sp-cards" id="spCards"></div>
+    <div class="sp-sec" id="spFunSec">
+      <h3>Воронка за 7 дней <span class="note" id="spFunNote"></span></h3>
+      <div class="fun" id="spFun"></div>
+      <div id="spBn"></div>
+    </div>
     <div class="sp-sec">
       <h3>Заказы: 60 дней истории + прогноз 30 дней <span class="note">линия — среднее за 7 дней, коридор — пессимист/оптимист</span></h3>
       <svg id="fchart"></svg>
@@ -392,6 +419,22 @@ var PHASE_REC = {
   "вне сезона":      "спрос ниже среднего — держать минимальный запас, не перезакладываться"
 };
 var BUY_REC = "проверить цену в рынке, отзывы клиентов (товар на доработку), позиционирование карточки";
+/* ===== ВОРОНКА: ступени, пороги и чек-листы (чек-листы можно переписать в листе config:
+   строки «чеклист показ», «чеклист корзина», «чеклист заказ», «чеклист выкуп») ===== */
+var FUN_STEPS=[
+  {k:"ctr", short:"CTR",     name:"Показ → клик",      vol:"views", minVol:1000, unit:"показов"},
+  {k:"cr1", short:"корзина", name:"Карточка → корзина", vol:"open",  minVol:100,  unit:"переходов"},
+  {k:"cr2", short:"заказ",   name:"Корзина → заказ",    vol:"cart",  minVol:20,   unit:"корзин"},
+  {k:"buy", short:"выкуп",   name:"Заказ → выкуп",      vol:"orders",minVol:10,   unit:"заказов"}
+];
+var FUN_GAP=20;      // на сколько % ниже нормы — уже проблема (config: «воронка порог»)
+var FUN_LOST=3;      // минимум потерянных заказов в неделю, иначе не сигналим (config: «воронка потери»)
+var FUN_CHECK={
+  ctr:"главное фото · цена и скидка · позиция в выдаче · ставка в рекламе · релевантность запросу · отображение размеров",
+  cr1:"первые 2–4 фото · видео и рич-контент · название · цена · рейтинг и число отзывов · наличие размеров · срок доставки",
+  cr2:"описание и характеристики · отзывы с фото · динамика цены · размерная сетка · срок доставки · бонусы и акции",
+  buy:"качество и посадка · соответствие описанию · упаковка · честные фото · размерная сетка"
+};
 var CRIT_REC = "выкуп ниже критического — вероятны дефекты лекал или ткани, товар нужно проверить и отправить на доработку";
 
 /* ========= УТИЛИТЫ ========= */
@@ -498,8 +541,8 @@ var sortKey="profit", sortDir=-1, searchQ="", flagFilter="";
 function fetchText(u){ return fetch(bust(u)).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); }); }
 function tryCSV(u){ return fetchText(u).then(parseCSV).catch(function(){ return null; }); }
 
-var chkFrom=addDays(todayISO(),-100);
-var CHK_QUERY="select A,B,BS,BR,BX,CC,CF,CH,CI,CK,CS,DD,DP,DX where A >= date '"+chkFrom+"'";
+var chkFrom=addDays(todayISO(),-70);
+var CHK_QUERY="select A,B,H,I,Q,BP,BR,BS,BT,BX,CB,CC,CF,CH,CI,CK,CS,DD,DP,DX where A >= date '"+chkFrom+"'";
 Promise.all([
   fetchText(gvizUrl("checklist",CHK_QUERY)).then(parseCSV),
   tryCSV(gvizUrl("cards","select A,C,D,F")),
@@ -543,6 +586,19 @@ function parseConfig(rows){
       }
     }
     if(k.indexOf("разгон")>=0 && v1>0) NORM.rampDays=Math.round(v1);
+    if(k.indexOf("воронка")===0){
+      if(k.indexOf("порог")>=0 && v1>0) FUN_GAP=v1;
+      if(k.indexOf("потер")>=0 && v1>0) FUN_LOST=v1;
+    }
+    if(k.indexOf("чеклист")===0 || k.indexOf("чек-лист")===0){
+      var txt=(r[1]||"").trim();
+      if(txt){
+        if(k.indexOf("показ")>=0||k.indexOf("ctr")>=0) FUN_CHECK.ctr=txt;
+        else if(k.indexOf("корзин")>=0) FUN_CHECK.cr1=txt;
+        else if(k.indexOf("заказ")>=0) FUN_CHECK.cr2=txt;
+        else if(k.indexOf("выкуп")>=0) FUN_CHECK.buy=txt;
+      }
+    }
     /* нормативы запаса по фазам сезона */
     if(k.indexOf("запас")===0 && v1>0 && v2>0){
       var ph=null;
@@ -622,6 +678,8 @@ function parseDaily(rows){
   if(!rows||rows.length<2) return;
   var h=rows[0].map(function(x){return x.trim();});
   function ix(n){ return h.indexOf(n); }
+  var iVw=ix("views"), iCl=ix("clicks"), iPos=ix("avg_position"),
+      iOc=ix("open_card_count"), iCart=ix("add_to_cart_count"), iBc=ix("buyouts_count");
   var iD=ix("date"), iNm=ix("nm_id"), iO=ix("orders_count"), iR=ix("orders_sum_rub"),
       iBuy=ix("buyout_percent"), iPr=ix("avg_price"), iSt=ix("stocks"),
       iTo=ix("in_way_to_client"), iFr=ix("in_way_from_client"), iRp=ix("returns_plan"),
@@ -644,7 +702,13 @@ function parseDaily(rows){
       ordersRub:iR>=0? num(r[iR]):0,
       profit:iPf>=0? num(r[iPf]):0,
       returns:iRet>=0? num(r[iRet]):0,
-      buyDay:(o>0&&buyPct>0)? buyPct : null
+      buyDay:(o>0&&buyPct>0)? buyPct : null,
+      views:iVw>=0? num(r[iVw]):0,
+      clicks:iCl>=0? num(r[iCl]):0,
+      open:iOc>=0? num(r[iOc]):0,
+      cart:iCart>=0? num(r[iCart]):0,
+      buyc:iBc>=0? num(r[iBc]):0,
+      pos:iPos>=0? num(r[iPos]):0
     });
     if(o>0 && (!FIRST[sku] || d<FIRST[sku])) FIRST[sku]=d;
     if(!DATA_MIN || d<DATA_MIN) DATA_MIN=d;
@@ -785,6 +849,95 @@ function daysStatus(days, ph){
   if(days>ph.max) return "high";
   return "ok";
 }
+/* ---------- ВОРОНКА ---------- */
+/* сумма ступеней воронки по товару за набор дней */
+function funAgg(sku, dates){
+  var set={}; dates.forEach(function(d){set[d]=1;});
+  var a={views:0, clicks:0, open:0, cart:0, orders:0, buyc:0, buyW:0, buyO:0, posSum:0, posN:0};
+  RAW.forEach(function(r){
+    if(r.sku!==sku || !set[r.date]) return;
+    a.views+=r.views; a.clicks+=r.clicks; a.open+=r.open; a.cart+=r.cart;
+    a.orders+=r.orders; a.buyc+=r.buyc;
+    if(r.buyDay!=null){ a.buyW+=r.orders*r.buyDay; a.buyO+=r.orders; }
+    if(r.pos>0){ a.posSum+=r.pos; a.posN++; }
+  });
+  return a;
+}
+/* конверсии ступеней; null — если объём слишком мал, чтобы делать выводы */
+function funConv(a, strict){
+  function ok(v, min){ return strict? v>=min : v>0; }
+  return {
+    ctr: ok(a.views,300)? a.clicks/a.views*100 : null,
+    cr1: ok(a.open,50)?   a.cart/a.open*100    : null,
+    cr2: ok(a.cart,10)?   a.orders/a.cart*100  : null,
+    buy: a.buyO>0?        a.buyW/a.buyO        : null,
+    pos: a.posN>0?        a.posSum/a.posN      : null
+  };
+}
+var FUN={};        // sku -> {cur, base, conv7, conv30, steps, bn}
+var FUN_CAT={};    // категория -> медианы конверсий за 30 дней
+function medianOf(arr){
+  arr=arr.filter(function(x){return x!=null;}).sort(function(a,b){return a-b;});
+  return arr.length? arr[Math.floor(arr.length/2)] : null;
+}
+function buildFunnel(){
+  FUN={}; FUN_CAT={};
+  var p7=periodDates(7);
+  var d30=[]; for(var i=29;i>=0;i--) d30.push(addDays(p7.last,-i));
+  var skus=Object.keys(PRODUCTS);
+  var tmp={};
+  skus.forEach(function(s){
+    var a7=funAgg(s,p7.cur), a30=funAgg(s,d30);
+    tmp[s]={a7:a7, a30:a30, c7:funConv(a7,false), c30:funConv(a30,true)};
+  });
+  /* медианы по категориям — только по товарам с достаточным объёмом */
+  var byCat={};
+  skus.forEach(function(s){
+    var cat=(PRODUCTS[s]&&PRODUCTS[s].category)||"—";
+    var o=byCat[cat]||(byCat[cat]={ctr:[],cr1:[],cr2:[],buy:[]});
+    ["ctr","cr1","cr2","buy"].forEach(function(k){ o[k].push(tmp[s].c30[k]); });
+  });
+  Object.keys(byCat).forEach(function(cat){
+    FUN_CAT[cat]={};
+    ["ctr","cr1","cr2","buy"].forEach(function(k){ FUN_CAT[cat][k]=medianOf(byCat[cat][k]); });
+  });
+  /* ступени и узкое место */
+  skus.forEach(function(s){
+    var t=tmp[s], cat=(PRODUCTS[s]&&PRODUCTS[s].category)||"—";
+    var cm=FUN_CAT[cat]||{};
+    var steps=FUN_STEPS.map(function(st){
+      var fact=t.c7[st.k], vol=t.a7[st.vol]||0;
+      var own=t.c30[st.k], catv=cm[st.k];
+      var res={k:st.k, short:st.short, name:st.name, unit:st.unit, fact:fact, vol:vol, own:own, cat:catv,
+               enough:(vol>=st.minVol && fact!=null)};
+      if(!res.enough) return res;
+      var norm=null, src="";
+      if(own!=null && catv!=null){ norm=Math.max(own,catv); src=(norm===own?"своя за 30 дней":"медиана категории"); }
+      else if(own!=null){ norm=own; src="своя за 30 дней"; }
+      else if(catv!=null){ norm=catv; src="медиана категории"; }
+      if(norm==null||norm<=0) return res;
+      res.norm=norm; res.src=src;
+      res.gap=(fact-norm)/norm*100;
+      return res;
+    });
+    /* сколько заказов в неделю теряем на каждой ступени, если довести её до нормы */
+    var c=t.c7;
+    steps.forEach(function(st){
+      st.lost=0;
+      if(st.norm==null||st.gap>=0) return;
+      var d=(st.norm-st.fact)/100;
+      if(st.k==="ctr") st.lost=t.a7.views*d*((c.cr1||0)/100)*((c.cr2||0)/100);
+      else if(st.k==="cr1") st.lost=t.a7.open*d*((c.cr2||0)/100);
+      else if(st.k==="cr2") st.lost=t.a7.cart*d;
+      else if(st.k==="buy") st.lost=0;   /* выкуп в заказах не теряется — считаем отдельно */
+    });
+    var bad=steps.filter(function(st){ return st.norm!=null && st.gap<=-FUN_GAP; });
+    /* выкуп сигналим всегда, остальные ступени — если потери заметные */
+    bad=bad.filter(function(st){ return st.k==="buy" ? true : st.lost>=FUN_LOST; });
+    bad.sort(function(a,b){ return (b.lost||0)-(a.lost||0); });
+    FUN[s]={a7:t.a7, a30:t.a30, c7:t.c7, c30:t.c30, steps:steps, bn:bad[0]||null, cat:cat};
+  });
+}
 /* период разгона: товар появился в данных недавно (< NORM.rampDays дней назад) */
 function rampInfo(sku){
   var f=FIRST[sku];
@@ -865,6 +1018,7 @@ var CUR, PREV, P, ROWS=null;
 function render(){
   P=periodDates(N);
   CUR=aggregate(P.cur); PREV=aggregate(P.prev);
+  buildFunnel();
   ROWS=buildRows();
   renderCards(); renderChart(); renderSummary(); renderTable();
 }
@@ -877,7 +1031,10 @@ var SUMDEF=[
   {f:"buycrit", t:"Выкуп ниже "+"20%",  rec:"вероятны дефекты лекал или ткани — товар на проверку и доработку"},
   {f:"buylow",  t:"Выкуп ниже нормы",   rec:"проверить цену в рынке, отзывы (на доработку), позиционирование"},
   {f:"drop",    t:"Заказы упали >30%",  rec:"проверить цену, позицию в выдаче, рекламу и остатки по размерам"},
-  {f:"ramp",    t:"В периоде разгона",  rec:"меньше 30 дней в продаже — выводы по динамике делать рано"}
+  {f:"ramp",    t:"В периоде разгона",  rec:"меньше 30 дней в продаже — выводы по динамике делать рано"},
+  {f:"fun_ctr", t:"Воронка: низкий CTR", rec:"мало кликов на показ: главное фото, цена, позиция в выдаче, ставка"},
+  {f:"fun_cr1", t:"Воронка: не кладут в корзину", rec:"карточка не убеждает: фото, видео, отзывы, цена, размеры"},
+  {f:"fun_cr2", t:"Воронка: корзина без заказа", rec:"описание, отзывы с фото, динамика цены, размерная сетка, доставка"}
 ];
 function renderSummary(){
   var rows=ROWS||[];
@@ -1040,6 +1197,7 @@ var COLS=[
   {k:"stock", t:"Остаток",      num:true},
   {k:"days",  t:"Хватит дней",  num:true},
   {k:"ordBy", t:"Заказать до",  num:true},
+  {k:"bneck", t:"Узкое место",  num:false},
   {k:"sig",   t:"Сигналы",      num:false},
   {k:"fc",    t:"",             num:false}
 ];
@@ -1059,6 +1217,8 @@ function buildRows(){
     var b=buyAvg(c);
     if(b==null && st && st.buyPct>0) b=st.buyPct;
     var ph=phaseOf(s), bn=buyNorm(s), rp=rampInfo(s);
+    var fn=FUN[s]||null;
+    var bneck=(fn&&!rp.ramp)? fn.bn : null;
     var days=dl? (isFinite(dl.days)? dl.days : 9999) : null;
     var stock=st? (st.total||st.stocks) : null;
     var bs=buyStatus(b,bn);
@@ -1072,6 +1232,7 @@ function buildRows(){
     else if(!rp.ramp&&ds==="low") flags.push("short");
     if(rp.ramp) flags.push("ramp");
     if(!rp.ramp&&dyn!==null&&dyn<=-30&&p.orders>=5) flags.push("drop");
+    if(bneck) flags.push("fun_"+bneck.k);
     rows.push({
       sku:s, prod:prod||null,
       orders:c.orders, profit:c.profit,
@@ -1080,7 +1241,8 @@ function buildRows(){
       stock:stock, st:st||null,
       days:days,
       ordBy:dl? orderByDate(dl.days) : null,
-      ph:ph, bn:bn, bs:bs, ds:ds, ramp:rp.ramp, rampDays:rp.days, flags:flags
+      ph:ph, bn:bn, bs:bs, ds:ds, ramp:rp.ramp, rampDays:rp.days, flags:flags,
+      fn:fn, bneck:bneck
     });
   });
   return rows;
@@ -1110,8 +1272,25 @@ var SIG={
   over:   {cls:"warn", t:"перегруз", tip:"запас больше нормы фазы сезона"},
   short:  {cls:"bad",  t:"дефицит",  tip:"запас меньше нормы фазы сезона"},
   ramp:   {cls:"new",  t:"разгон",   tip:"товар в продаже меньше 30 дней"},
+  fun_ctr:{cls:"bad",  t:"CTR ↓",    tip:"кликов на показ меньше нормы"},
+  fun_cr1:{cls:"bad",  t:"корзина ↓",tip:"из карточки редко кладут в корзину"},
+  fun_cr2:{cls:"bad",  t:"заказ ↓",  tip:"из корзины редко доходят до заказа"},
+  fun_buy:{cls:"warn", t:"выкуп ↓",  tip:"выкуп ниже нормы"},
   drop:   {cls:"bad",  t:"падение",  tip:"заказы упали больше 30% за период"}
 };
+function bneckCell(r){
+  if(r.ramp) return '<span class="bncell gray" title="товар в разгоне — воронку оцениваем позже">разгон</span>';
+  if(!r.fn) return '<span class="bncell gray">—</span>';
+  if(!r.bneck){
+    var any=r.fn.steps.some(function(s){return s.enough;});
+    return any? '<span class="bncell gray" title="все ступени воронки в норме">нет</span>'
+              : '<span class="bncell gray" title="мало трафика для оценки">мало данных</span>';
+  }
+  var b=r.bneck;
+  var t=b.name+": "+fmt1(b.fact)+"% при норме "+fmt1(b.norm)+"% ("+b.src+")"+
+        (b.lost>=1? " · теряем ~"+Math.round(b.lost)+" заказов в неделю":"");
+  return '<span class="bncell '+(b.k==="buy"?"warn":"bad")+'" title="'+t+'">'+b.short+' '+Math.round(b.gap)+'%</span>';
+}
 function sigCell(r){
   if(!r.flags.length) return '<span class="sig ok" title="отклонений от нормативов нет">норма</span>';
   return r.flags.map(function(f){
@@ -1177,16 +1356,17 @@ function renderTable(){
       '<td>'+stCell+'</td>'+
       '<td>'+daysCell(r)+'</td>'+
       '<td>'+ordByCell(r)+'</td>'+
+      '<td>'+bneckCell(r)+'</td>'+
       '<td>'+sigCell(r)+'</td>'+
       '<td><button class="fbtn" data-sku="'+esc(r.sku)+'">Прогноз</button></td></tr>';
   });
-  document.getElementById("tbody").innerHTML=tb || '<tr><td colspan="11" style="text-align:center;color:#898781">ничего не найдено</td></tr>';
+  document.getElementById("tbody").innerHTML=tb || '<tr><td colspan="12" style="text-align:center;color:#898781">ничего не найдено</td></tr>';
   document.getElementById("rowcount").textContent=rows.length+" товаров"+
     (flagFilter? " · фильтр: "+(SIG[flagFilter]? SIG[flagFilter].t:flagFilter) : "");
   document.getElementById("thead").onclick=function(e){
     var t=e.target.closest("th"); if(!t) return;
     var k=t.dataset.k;
-    if(k==="fc"||k==="sig") return;
+    if(k==="fc"||k==="sig"||k==="bneck") return;
     if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=(k==="sku"?1:-1); }
     renderTable();
   };
@@ -1253,6 +1433,7 @@ function openPanel(sku){
     updatePanel();
   };
   renderComment(sku);
+  renderFunnel(sku);
   updatePanel();
   document.getElementById("ovl").classList.add("open");
   var pn=document.getElementById("spanel");
@@ -1340,6 +1521,66 @@ function updatePanel(){
   document.getElementById("slPriceV").textContent=fmtInt(sim.price)+" ₽";
   renderFChart(fc);
 }
+/* воронка в панели товара */
+function renderFunnel(sku){
+  var sec=document.getElementById("spFunSec"), box=document.getElementById("spFun"), bnb=document.getElementById("spBn");
+  var f=FUN[sku];
+  if(!f){ sec.style.display="none"; return; }
+  sec.style.display="";
+  var p7=periodDates(7);
+  document.getElementById("spFunNote").textContent =
+    dShort(p7.cur[0])+"–"+dShort(p7.last)+" · норма: своя за 30 дней и медиана категории «"+f.cat+"»";
+  var a=f.a7, c=f.c7;
+  var levels=[
+    {n:"Показы рекламы", v:a.views},
+    {n:"Клики по рекламе", v:a.clicks},
+    {n:"Переходы в карточку", v:a.open},
+    {n:"Добавили в корзину", v:a.cart},
+    {n:"Заказы", v:a.orders},
+    {n:"Выкупы", v:a.buyc}
+  ];
+  var max=1; levels.forEach(function(l){ if(l.v>max) max=l.v; });
+  var stepAfter={1:"ctr", 3:"cr1", 4:"cr2", 5:"buy"};
+  var html="";
+  levels.forEach(function(l,i){
+    var w=Math.max(2, l.v/max*100);
+    html+='<div class="fstep"><div class="fl">'+l.n+'</div>'+
+      '<div class="fbar"><i style="width:'+w.toFixed(1)+'%"></i></div>'+
+      '<div class="fv">'+fmtInt(l.v)+'</div></div>';
+    var sk=stepAfter[i+1];
+    if(sk){
+      var st=f.steps.filter(function(x){return x.k===sk;})[0];
+      var cls="", txt="";
+      if(!st||st.fact==null) txt='<span class="fnorm">нет данных</span>';
+      else if(!st.enough) txt='<b>'+fmt1(st.fact)+'%</b> <span class="fnorm">— мало данных для вывода ('+fmtInt(st.vol)+' '+st.unit+')</span>';
+      else if(st.norm==null) txt='<b>'+fmt1(st.fact)+'%</b> <span class="fnorm">— нормы пока нет</span>';
+      else{
+        cls=st.gap<=-FUN_GAP? "bad" : (st.gap>=10? "good":"");
+        txt='<b>'+fmt1(st.fact)+'%</b> <span class="fnorm">норма '+fmt1(st.norm)+'% ('+st.src+') · '+
+            (st.gap>0?"+":"")+Math.round(st.gap)+'%'+(st.lost>=1? ' · −'+Math.round(st.lost)+' заказов в неделю':'')+'</span>';
+      }
+      html+='<div class="fconv '+cls+'"><div class="c">'+(st?st.name:"")+': '+txt+'</div></div>';
+    }
+  });
+  box.innerHTML=html;
+  /* вывод и чек-лист */
+  var rp=rampInfo(sku);
+  if(rp.ramp){
+    bnb.innerHTML='<div class="bnbox">Товар в продаже '+rp.days+' дн. — период разгона, воронку оценивать рано: трафик и конверсии ещё не устоялись.</div>';
+    return;
+  }
+  var b=f.bn;
+  if(!b){
+    var any=f.steps.some(function(s){return s.enough;});
+    bnb.innerHTML='<div class="bnbox ok">'+(any? "Узкого места нет — все ступени воронки в пределах нормы."
+      : "Трафика пока мало, чтобы делать выводы по воронке.")+'</div>';
+    return;
+  }
+  var lostTxt=b.lost>=1? " Если довести ступень до нормы, это примерно <b>+"+Math.round(b.lost)+" заказов в неделю</b>." : "";
+  bnb.innerHTML='<div class="bnbox">Узкое место: <b>'+b.name+'</b> — '+fmt1(b.fact)+'% при норме '+
+    fmt1(b.norm)+'% ('+b.src+'), это '+Math.round(b.gap)+'%.'+lostTxt+
+    '<div class="bnlist">'+FUN_CHECK[b.k].split("·").map(function(x){return "<li>"+x.trim()+"</li>";}).join("")+'</div></div>';
+}
 function scard(lbl,val,sub){
   return '<div class="scard"><div class="lbl">'+lbl+'</div><div class="val">'+val+'</div><div class="sub2">'+sub+'</div></div>';
 }
@@ -1424,6 +1665,14 @@ function renderComment(sku){
       "% за неделю — проверить цену в рынке, позицию в выдаче, рекламу и наличие размеров");
     else if(d!==null&&d>=30) parts.push("заказы выросли на "+Math.round(d)+
       "% за неделю — проверить, хватит ли запаса на этот темп");
+  }
+  /* 1б. узкое место воронки */
+  var f=FUN[sku];
+  if(!rp.ramp && f && f.bn){
+    var b=f.bn;
+    parts.push("узкое место воронки — «"+b.name+"»: "+fmt1(b.fact)+"% при норме "+fmt1(b.norm)+"% ("+b.src+")"+
+      (b.lost>=1? ", это примерно "+Math.round(b.lost)+" потерянных заказов в неделю":"")+
+      "; проверить: "+FUN_CHECK[b.k]);
   }
   /* 2. выкуп относительно нормы ниши/сегмента */
   var buy=buyShare(sku,a7)*100;
