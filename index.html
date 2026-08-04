@@ -1534,17 +1534,18 @@ function renderFunnel(sku){
   var levels=[
     {n:"Показы рекламы", v:a.views},
     {n:"Клики по рекламе", v:a.clicks},
-    {n:"Переходы в карточку", v:a.open},
+    {n:"Переходы в карточку", v:a.open, note:"реклама + органика"},
     {n:"Добавили в корзину", v:a.cart},
     {n:"Заказы", v:a.orders},
     {n:"Выкупы", v:a.buyc}
   ];
-  var max=1; levels.forEach(function(l){ if(l.v>max) max=l.v; });
+  /* два масштаба: реклама и общий трафик — иначе воронка выглядит расширяющейся */
+  var maxAds=Math.max(1,a.views), maxOrg=Math.max(1,a.open,a.cart,a.orders,a.buyc);
   var stepAfter={1:"ctr", 3:"cr1", 4:"cr2", 5:"buy"};
   var html="";
   levels.forEach(function(l,i){
-    var w=Math.max(2, l.v/max*100);
-    html+='<div class="fstep"><div class="fl">'+l.n+'</div>'+
+    var w=Math.max(2, l.v/(i<2? maxAds:maxOrg)*100);
+    html+='<div class="fstep"><div class="fl">'+l.n+(l.note? ' <span class="fnorm">'+l.note+'</span>':'')+'</div>'+
       '<div class="fbar"><i style="width:'+w.toFixed(1)+'%"></i></div>'+
       '<div class="fv">'+fmtInt(l.v)+'</div></div>';
     var sk=stepAfter[i+1];
