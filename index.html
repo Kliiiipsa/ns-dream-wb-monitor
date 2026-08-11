@@ -430,6 +430,9 @@ var FUN_STEPS=[
 ];
 var FUN_GAP=20;      // на сколько % ниже нормы — уже проблема (config: «воронка порог»)
 var FUN_LOST=3;      // минимум потерянных заказов в неделю, иначе не сигналим (config: «воронка потери»)
+var FUN_MKT_TOP=10;  // сколько товаров помечаем значком «ниже рынка» (config: «воронка рынок топ»)
+var FUN_MKT_MIN=10;  // и только если до рынка не меньше стольких заказов в неделю
+var MKT_TOP={};      // sku -> 1 для попавших в этот топ
 /* Рыночные ориентиры (обратная связь коллег, август 2026): норма и «хорошо».
    CTR намеренно без рыночной нормы: мы делим клики на РЕКЛАМНЫЕ показы 10X, а сервисы
    считают CTR по показам в выдаче — наше число примерно вдвое ниже, сравнивать нельзя.
@@ -607,6 +610,7 @@ function parseConfig(rows){
     if(k.indexOf("воронка")===0){
       if(k.indexOf("порог")>=0 && v1>0) FUN_GAP=v1;
       if(k.indexOf("потер")>=0 && v1>0) FUN_LOST=v1;
+      if(k.indexOf("рынок")>=0 && v1>0){ FUN_MKT_TOP=Math.round(v1); if(v2>0) FUN_MKT_MIN=v2; }
     }
     if(k.indexOf("рынок")===0 && v1>0){
       var mk=null;
@@ -1046,6 +1050,13 @@ function buildFunnel(){
     FUN[s]={a7:t.a7, a30:t.a30, c7:t.c7, c30:t.c30, steps:steps, bn:bad[0]||null,
             cat:cat, grp:grp, sizes:sizeInfo(s), mktLost:mktLost};
   });
+  /* «Ниже рынка» — не порог, а рейтинг: почти весь ассортимент ниже ориентиров,
+     поэтому помечаем только товары с самым большим потенциалом до рынка.        */
+  MKT_TOP={};
+  var rank=Object.keys(FUN).filter(function(s){
+    return !rampInfo(s).ramp && (FUN[s].mktLost||0)>=FUN_MKT_MIN;
+  }).sort(function(a,b){ return (FUN[b].mktLost||0)-(FUN[a].mktLost||0); });
+  rank.slice(0, FUN_MKT_TOP).forEach(function(s){ MKT_TOP[s]=1; });
 }
 /* период разгона: товар появился в данных недавно (< NORM.rampDays дней назад) */
 function rampInfo(sku){
@@ -1145,7 +1156,7 @@ var SUMDEF=[
   {f:"fun_cr1", t:"Воронка: не кладут в корзину", rec:"карточка не убеждает: фото, видео, отзывы, цена, размеры"},
   {f:"fun_cr2", t:"Воронка: корзина без заказа", rec:"описание, отзывы с фото, динамика цены, размерная сетка, доставка"},
   {f:"sizes",   t:"Выпали размеры", rec:"главная причина просадок: без размеров падает ранжирование, дорожает реклама, режется корзина"},
-  {f:"below_mkt", t:"Ниже рыночных норм", rec:"конверсии в корзину и заказ ниже ориентиров рынка — есть куда расти планомерной работой"}
+  {f:"below_mkt", t:"Наибольший разрыв с рынком", rec:"здесь до рыночных конверсий больше всего заказов — начинать работу с ними"}
 ];
 function renderSummary(){
   var rows=ROWS||[];
@@ -1345,7 +1356,7 @@ function buildRows(){
     if(!rp.ramp&&dyn!==null&&dyn<=-30&&p.orders>=5) flags.push("drop");
     if(bneck) flags.push("fun_"+bneck.k);
     if(fn&&fn.sizes&&fn.sizes.missing.length&&fn.sizes.total>=3) flags.push("sizes");
-    if(fn&&!rp.ramp&&fn.mktLost>=FUN_LOST) flags.push("below_mkt");
+    if(fn&&MKT_TOP[s]) flags.push("below_mkt");
     rows.push({
       sku:s, prod:prod||null,
       orders:c.orders, profit:c.profit,
@@ -1390,7 +1401,7 @@ var SIG={
   fun_cr2:{cls:"bad",  t:"заказ ↓",  tip:"из корзины редко доходят до заказа"},
   fun_buy:{cls:"warn", t:"выкуп ↓",  tip:"выкуп ниже нормы"},
   sizes:  {cls:"bad",  t:"размеры",   tip:"часть размерного ряда закончилась"},
-  below_mkt:{cls:"warn", t:"ниже рынка", tip:"конверсии ниже рыночных ориентиров"},
+  below_mkt:{cls:"warn", t:"разрыв с рынком", tip:"один из товаров с самым большим потенциалом до рыночных конверсий"},
   drop:   {cls:"bad",  t:"падение",  tip:"заказы упали больше 30% за период"}
 };
 function bneckCell(r){
