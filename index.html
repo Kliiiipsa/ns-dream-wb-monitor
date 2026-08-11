@@ -304,7 +304,8 @@
 
     <footer>Заказы, маржа, выкуп, возвраты и остатки подтягиваются из платной таблицы 10X WB (новый кабинет) при каждом открытии страницы; сезонность и комментарии — из таблицы мониторинга.<br>
     Срок поставки для даты «заказать до» берётся из листа config (по умолчанию 20 дней) — его можно менять в таблице.<br>
-    Нормативы (выкуп по сегментам и коридор, критический выкуп, период разгона, запас в днях по фазам сезона) тоже задаются в листе config; средний выкуп ниши — из МПСтатс через лист «Сезонность».</footer>
+    Нормативы (выкуп по сегментам и коридор, критический выкуп, период разгона, запас в днях по фазам сезона) тоже задаются в листе config; средний выкуп ниши — из МПСтатс через лист «Сезонность».<br>
+    Воронка: норма ступени — максимум из своей за 30 дней и медианы группы схожих моделей; рыночные ориентиры (корзина, заказ) заданы в config строками «рынок …». CTR считается от рекламных показов 10X и с внешними сервисами напрямую не сравним.</footer>
   </div>
 </div>
 
@@ -429,12 +430,28 @@ var FUN_STEPS=[
 ];
 var FUN_GAP=20;      // на сколько % ниже нормы — уже проблема (config: «воронка порог»)
 var FUN_LOST=3;      // минимум потерянных заказов в неделю, иначе не сигналим (config: «воронка потери»)
-var FUN_CHECK={
-  ctr:"главное фото · цена и скидка · позиция в выдаче · ставка в рекламе · релевантность запросу · отображение размеров",
-  cr1:"первые 2–4 фото · видео и рич-контент · название · цена · рейтинг и число отзывов · наличие размеров · срок доставки",
-  cr2:"описание и характеристики · отзывы с фото · динамика цены · размерная сетка · срок доставки · бонусы и акции",
-  buy:"качество и посадка · соответствие описанию · упаковка · честные фото · размерная сетка"
+/* Рыночные ориентиры (обратная связь коллег, август 2026): норма и «хорошо».
+   CTR намеренно без рыночной нормы: мы делим клики на РЕКЛАМНЫЕ показы 10X, а сервисы
+   считают CTR по показам в выдаче — наше число примерно вдвое ниже, сравнивать нельзя.
+   Меняются в листе config: «рынок корзина | 11 | 15», «рынок заказ | 32 | 40».         */
+var FUN_MKT={
+  ctr:null,
+  cr1:{norm:11, good:15},
+  cr2:{norm:32, good:40},
+  buy:null            /* для выкупа норма уже есть — по нише МПСтатс и сегменту */
 };
+/* Чек-листы: порядок проверки — по приоритету из ответов коллег */
+var FUN_CHECK={
+  ctr:"главное фото: первый кадр, инфографика, трендовость · цена относительно конкурентов · позиция по ключам и СЕО · правильная категория · рейтинг и число отзывов · полнота размерного ряда",
+  cr1:"все размеры в наличии · фотоворонка и УТП: посадка, длина, карманы, не просвечивает · цена и скидка · отзывы с фото и рейтинг · видеообложка с автозапуском",
+  cr2:"цена и скачок СПП · срок доставки и локализация остатков · отзывы: отработка негатива, закрепы с УТП · участие в акциях, промокод · сезонность",
+  buy:"соответствие размерной сетке: посадка, длина, ростовка · цвет как на фото · качество ткани и пошива · упаковка · честность фото и описания"
+};
+/* Группы схожих моделей: сравниваем товар с ними, а не со всей категорией.
+   Первое совпавшее слово в названии задаёт группу (config: «группа <слово>»). */
+var GROUP_KW=["школьн","палаццо","клеш","спортивн","кожан","джинс","кружевн","вельветов",
+              "карго","прямые","классическ","оверсайз","широк","укороченн","летние"];
+var GROUP_MIN=5;     // меньше товаров в группе — откатываемся на категорию
 var CRIT_REC = "выкуп ниже критического — вероятны дефекты лекал или ткани, товар нужно проверить и отправить на доработку";
 
 /* ========= УТИЛИТЫ ========= */
@@ -533,6 +550,7 @@ var SEASON={};     // категория -> [12 коэффициентов]
 var SEASON_DEF=[1,1,1,1,1,1,1,1,1,1,1,1];
 var COMMENTS={};   // sku -> {date, text}
 var STOCK_OK=false, STOCK_DATE="";
+var SIZES={};      // sku -> {all:{размер:1}, cur:{размер:кол-во}, date}
 var FIRST={};      // sku -> дата первой продажи (для периода разгона)
 var DATA_MIN="", DATA_MAX="";
 var N=7;
@@ -542,7 +560,7 @@ function fetchText(u){ return fetch(bust(u)).then(function(r){ if(!r.ok) throw n
 function tryCSV(u){ return fetchText(u).then(parseCSV).catch(function(){ return null; }); }
 
 var chkFrom=addDays(todayISO(),-70);
-var CHK_QUERY="select A,B,H,I,Q,BP,BR,BS,BT,BX,CB,CC,CF,CH,CI,CK,CS,DD,DP,DX where A >= date '"+chkFrom+"'";
+var CHK_QUERY="select A,B,H,I,Q,BP,BR,BS,BT,BX,CB,CC,CF,CG,CH,CI,CK,CS,DD,DP,DX where A >= date '"+chkFrom+"'";
 Promise.all([
   fetchText(gvizUrl("checklist",CHK_QUERY)).then(parseCSV),
   tryCSV(gvizUrl("cards","select A,C,D,F")),
@@ -589,6 +607,17 @@ function parseConfig(rows){
     if(k.indexOf("воронка")===0){
       if(k.indexOf("порог")>=0 && v1>0) FUN_GAP=v1;
       if(k.indexOf("потер")>=0 && v1>0) FUN_LOST=v1;
+    }
+    if(k.indexOf("рынок")===0 && v1>0){
+      var mk=null;
+      if(k.indexOf("корзин")>=0) mk="cr1";
+      else if(k.indexOf("заказ")>=0) mk="cr2";
+      else if(k.indexOf("ctr")>=0||k.indexOf("клик")>=0) mk="ctr";
+      if(mk) FUN_MKT[mk]={norm:v1, good:(v2>0? v2 : v1*1.35)};
+    }
+    if(k.indexOf("группа")===0){
+      var gw=k.replace("группа","").trim();
+      if(gw && GROUP_KW.indexOf(gw)<0) GROUP_KW.unshift(gw);
     }
     if(k.indexOf("чеклист")===0 || k.indexOf("чек-лист")===0){
       var txt=(r[1]||"").trim();
@@ -679,7 +708,8 @@ function parseDaily(rows){
   var h=rows[0].map(function(x){return x.trim();});
   function ix(n){ return h.indexOf(n); }
   var iVw=ix("views"), iCl=ix("clicks"), iPos=ix("avg_position"),
-      iOc=ix("open_card_count"), iCart=ix("add_to_cart_count"), iBc=ix("buyouts_count");
+      iOc=ix("open_card_count"), iCart=ix("add_to_cart_count"), iBc=ix("buyouts_count"),
+      iSz=ix("stocks_sizes");
   var iD=ix("date"), iNm=ix("nm_id"), iO=ix("orders_count"), iR=ix("orders_sum_rub"),
       iBuy=ix("buyout_percent"), iPr=ix("avg_price"), iSt=ix("stocks"),
       iTo=ix("in_way_to_client"), iFr=ix("in_way_from_client"), iRp=ix("returns_plan"),
@@ -724,6 +754,12 @@ function parseDaily(rows){
         buyPct:0,
         avgPrice:iPr>=0? num(r[iPr]):0
       };
+    }
+    if(iSz>=0){
+      var szMap=parseSizes(r[iSz]);
+      var so=SIZES[sku]||(SIZES[sku]={all:{}, cur:{}, date:""});
+      for(var sn in szMap) so.all[sn]=1;
+      if(d>=so.date){ so.date=d; so.cur=szMap; }
     }
     var bm=iBm>=0? num(r[iBm]):0; if(bm>0&&bm<=1) bm=bm*100;
     var bcand=buyPct>0? buyPct : bm;
@@ -849,6 +885,41 @@ function daysStatus(days, ph){
   if(days>ph.max) return "high";
   return "ok";
 }
+/* ---------- РАЗМЕРНЫЙ РЯД ---------- */
+/* строка вида «46 - 11❗️ | 48 - 3❗️ | 50 - 14» -> {"46":11,"48":3,"50":14} */
+function parseSizes(s){
+  var out={}, parts=String(s||"").split("|");
+  for(var i=0;i<parts.length;i++){
+    var pr=parts[i].split(" - ");
+    if(pr.length<2) continue;
+    var nm=pr[0].replace(/\u2757/g,"").replace(/\ufe0f/g,"").trim();
+    var q=parseInt(String(pr[1]).replace(/[^0-9-]/g,""),10);
+    if(nm) out[nm]=isNaN(q)?0:q;
+  }
+  return out;
+}
+/* сколько размеров в наличии против обычного ряда; выпавшие — первый подозреваемый */
+function sizeInfo(sku){
+  var so=SIZES[sku];
+  if(!so) return null;
+  var all=Object.keys(so.all);
+  if(!all.length) return null;
+  var have=[], miss=[];
+  all.forEach(function(n){ if(so.cur[n]>0) have.push(n); else miss.push(n); });
+  return {total:all.length, inStock:have.length, missing:miss,
+          share: all.length? have.length/all.length : 1, date:so.date};
+}
+/* ---------- ГРУППА СХОЖИХ МОДЕЛЕЙ ---------- */
+var GRP_CACHE={};
+function groupOf(sku){
+  if(GRP_CACHE[sku]) return GRP_CACHE[sku];
+  var p=PRODUCTS[sku]||{}, t=((p.title||"")).toLowerCase(), cat=p.category||"—";
+  var g=cat;
+  for(var i=0;i<GROUP_KW.length;i++){
+    if(t.indexOf(GROUP_KW[i])>=0){ g=cat+" · "+GROUP_KW[i]; break; }
+  }
+  return (GRP_CACHE[sku]=g);
+}
 /* ---------- ВОРОНКА ---------- */
 /* сумма ступеней воронки по товару за набор дней */
 function funAgg(sku, dates){
@@ -890,34 +961,60 @@ function buildFunnel(){
     var a7=funAgg(s,p7.cur), a30=funAgg(s,d30);
     tmp[s]={a7:a7, a30:a30, c7:funConv(a7,false), c30:funConv(a30,true)};
   });
-  /* медианы по категориям — только по товарам с достаточным объёмом */
-  var byCat={};
+  /* медианы: сначала по группе схожих моделей, при нехватке товаров — по категории */
+  var byCat={}, byGrp={};
   skus.forEach(function(s){
-    var cat=(PRODUCTS[s]&&PRODUCTS[s].category)||"—";
+    var cat=(PRODUCTS[s]&&PRODUCTS[s].category)||"—", grp=groupOf(s);
     var o=byCat[cat]||(byCat[cat]={ctr:[],cr1:[],cr2:[],buy:[]});
-    ["ctr","cr1","cr2","buy"].forEach(function(k){ o[k].push(tmp[s].c30[k]); });
+    var g=byGrp[grp]||(byGrp[grp]={ctr:[],cr1:[],cr2:[],buy:[]});
+    ["ctr","cr1","cr2","buy"].forEach(function(k){ o[k].push(tmp[s].c30[k]); g[k].push(tmp[s].c30[k]); });
   });
+  function medMap(src){
+    var out={};
+    Object.keys(src).forEach(function(key){
+      out[key]={};
+      ["ctr","cr1","cr2","buy"].forEach(function(k){
+        var arr=src[key][k].filter(function(x){return x!=null;});
+        out[key][k]=(arr.length>=GROUP_MIN)? medianOf(arr) : null;
+        out[key][k+"_n"]=arr.length;
+      });
+    });
+    return out;
+  }
+  FUN_CAT=medMap(byCat);
+  var FUN_GRP=medMap(byGrp);
+  /* в категории порог мягче: там товаров заведомо больше */
   Object.keys(byCat).forEach(function(cat){
-    FUN_CAT[cat]={};
-    ["ctr","cr1","cr2","buy"].forEach(function(k){ FUN_CAT[cat][k]=medianOf(byCat[cat][k]); });
+    ["ctr","cr1","cr2","buy"].forEach(function(k){
+      if(FUN_CAT[cat][k]==null){
+        var arr=byCat[cat][k].filter(function(x){return x!=null;});
+        if(arr.length>=3) FUN_CAT[cat][k]=medianOf(arr);
+      }
+    });
   });
   /* ступени и узкое место */
   skus.forEach(function(s){
-    var t=tmp[s], cat=(PRODUCTS[s]&&PRODUCTS[s].category)||"—";
-    var cm=FUN_CAT[cat]||{};
+    var t=tmp[s], cat=(PRODUCTS[s]&&PRODUCTS[s].category)||"—", grp=groupOf(s);
+    var cm=FUN_CAT[cat]||{}, gm=FUN_GRP[grp]||{};
     var steps=FUN_STEPS.map(function(st){
       var fact=t.c7[st.k], vol=t.a7[st.vol]||0;
-      var own=t.c30[st.k], catv=cm[st.k];
-      var res={k:st.k, short:st.short, name:st.name, unit:st.unit, fact:fact, vol:vol, own:own, cat:catv,
+      var own=t.c30[st.k], grpv=gm[st.k], catv=cm[st.k];
+      var peer=(grpv!=null)? grpv : catv;
+      var peerSrc=(grpv!=null)? ("медиана группы «"+grp+"»") : "медиана категории";
+      var mkt=FUN_MKT[st.k];
+      var res={k:st.k, short:st.short, name:st.name, unit:st.unit, fact:fact, vol:vol,
+               own:own, peer:peer, peerSrc:peerSrc, grp:grp,
+               mkt:(mkt&&mkt.norm)||null, good:(mkt&&mkt.good)||null,
                enough:(vol>=st.minVol && fact!=null)};
       if(!res.enough) return res;
       var norm=null, src="";
-      if(own!=null && catv!=null){ norm=Math.max(own,catv); src=(norm===own?"своя за 30 дней":"медиана категории"); }
+      if(own!=null && peer!=null){ norm=Math.max(own,peer); src=(norm===own?"своя за 30 дней":peerSrc); }
       else if(own!=null){ norm=own; src="своя за 30 дней"; }
-      else if(catv!=null){ norm=catv; src="медиана категории"; }
+      else if(peer!=null){ norm=peer; src=peerSrc; }
       if(norm==null||norm<=0) return res;
       res.norm=norm; res.src=src;
       res.gap=(fact-norm)/norm*100;
+      if(res.mkt) res.gapMkt=(fact-res.mkt)/res.mkt*100;
       return res;
     });
     /* сколько заказов в неделю теряем на каждой ступени, если довести её до нормы */
@@ -931,11 +1028,23 @@ function buildFunnel(){
       else if(st.k==="cr2") st.lost=t.a7.cart*d;
       else if(st.k==="buy") st.lost=0;   /* выкуп в заказах не теряется — считаем отдельно */
     });
+    /* потенциал до рыночного ориентира — считаем так же, как потери до своей нормы */
+    steps.forEach(function(st){
+      st.lostMkt=0;
+      if(!st.mkt || st.fact==null || !st.enough || st.fact>=st.mkt) return;
+      var d=(st.mkt-st.fact)/100;
+      if(st.k==="ctr") st.lostMkt=t.a7.views*d*((c.cr1||0)/100)*((c.cr2||0)/100);
+      else if(st.k==="cr1") st.lostMkt=t.a7.open*d*((c.cr2||0)/100);
+      else if(st.k==="cr2") st.lostMkt=t.a7.cart*d;
+    });
     var bad=steps.filter(function(st){ return st.norm!=null && st.gap<=-FUN_GAP; });
     /* выкуп сигналим всегда, остальные ступени — если потери заметные */
     bad=bad.filter(function(st){ return st.k==="buy" ? true : st.lost>=FUN_LOST; });
     bad.sort(function(a,b){ return (b.lost||0)-(a.lost||0); });
-    FUN[s]={a7:t.a7, a30:t.a30, c7:t.c7, c30:t.c30, steps:steps, bn:bad[0]||null, cat:cat};
+    var mktLost=0;
+    steps.forEach(function(st){ mktLost+=st.lostMkt||0; });
+    FUN[s]={a7:t.a7, a30:t.a30, c7:t.c7, c30:t.c30, steps:steps, bn:bad[0]||null,
+            cat:cat, grp:grp, sizes:sizeInfo(s), mktLost:mktLost};
   });
 }
 /* период разгона: товар появился в данных недавно (< NORM.rampDays дней назад) */
@@ -1034,7 +1143,9 @@ var SUMDEF=[
   {f:"ramp",    t:"В периоде разгона",  rec:"меньше 30 дней в продаже — выводы по динамике делать рано"},
   {f:"fun_ctr", t:"Воронка: низкий CTR", rec:"мало кликов на показ: главное фото, цена, позиция в выдаче, ставка"},
   {f:"fun_cr1", t:"Воронка: не кладут в корзину", rec:"карточка не убеждает: фото, видео, отзывы, цена, размеры"},
-  {f:"fun_cr2", t:"Воронка: корзина без заказа", rec:"описание, отзывы с фото, динамика цены, размерная сетка, доставка"}
+  {f:"fun_cr2", t:"Воронка: корзина без заказа", rec:"описание, отзывы с фото, динамика цены, размерная сетка, доставка"},
+  {f:"sizes",   t:"Выпали размеры", rec:"главная причина просадок: без размеров падает ранжирование, дорожает реклама, режется корзина"},
+  {f:"below_mkt", t:"Ниже рыночных норм", rec:"конверсии в корзину и заказ ниже ориентиров рынка — есть куда расти планомерной работой"}
 ];
 function renderSummary(){
   var rows=ROWS||[];
@@ -1233,6 +1344,8 @@ function buildRows(){
     if(rp.ramp) flags.push("ramp");
     if(!rp.ramp&&dyn!==null&&dyn<=-30&&p.orders>=5) flags.push("drop");
     if(bneck) flags.push("fun_"+bneck.k);
+    if(fn&&fn.sizes&&fn.sizes.missing.length&&fn.sizes.total>=3) flags.push("sizes");
+    if(fn&&!rp.ramp&&fn.mktLost>=FUN_LOST) flags.push("below_mkt");
     rows.push({
       sku:s, prod:prod||null,
       orders:c.orders, profit:c.profit,
@@ -1276,6 +1389,8 @@ var SIG={
   fun_cr1:{cls:"bad",  t:"корзина ↓",tip:"из карточки редко кладут в корзину"},
   fun_cr2:{cls:"bad",  t:"заказ ↓",  tip:"из корзины редко доходят до заказа"},
   fun_buy:{cls:"warn", t:"выкуп ↓",  tip:"выкуп ниже нормы"},
+  sizes:  {cls:"bad",  t:"размеры",   tip:"часть размерного ряда закончилась"},
+  below_mkt:{cls:"warn", t:"ниже рынка", tip:"конверсии ниже рыночных ориентиров"},
   drop:   {cls:"bad",  t:"падение",  tip:"заказы упали больше 30% за период"}
 };
 function bneckCell(r){
@@ -1529,7 +1644,8 @@ function renderFunnel(sku){
   sec.style.display="";
   var p7=periodDates(7);
   document.getElementById("spFunNote").textContent =
-    dShort(p7.cur[0])+"–"+dShort(p7.last)+" · норма: своя за 30 дней и медиана категории «"+f.cat+"»";
+    dShort(p7.cur[0])+"–"+dShort(p7.last)+" · норма: своя за 30 дней и медиана группы «"+f.grp+"»"+
+    " · CTR считается от рекламных показов, с внешними сервисами не сравнивается";
   var a=f.a7, c=f.c7;
   var levels=[
     {n:"Показы рекламы", v:a.views},
@@ -1557,12 +1673,24 @@ function renderFunnel(sku){
       else if(st.norm==null) txt='<b>'+fmt1(st.fact)+'%</b> <span class="fnorm">— нормы пока нет</span>';
       else{
         cls=st.gap<=-FUN_GAP? "bad" : (st.gap>=10? "good":"");
+        var mktTxt="";
+        if(st.mkt) mktTxt=' · рынок '+fmt1(st.mkt)+'%'+(st.good? ' (хорошо '+fmt1(st.good)+'%)':'')+
+          (st.lostMkt>=1? ', до него +'+Math.round(st.lostMkt)+' заказов':'');
         txt='<b>'+fmt1(st.fact)+'%</b> <span class="fnorm">норма '+fmt1(st.norm)+'% ('+st.src+') · '+
-            (st.gap>0?"+":"")+Math.round(st.gap)+'%'+(st.lost>=1? ' · −'+Math.round(st.lost)+' заказов в неделю':'')+'</span>';
+            (st.gap>0?"+":"")+Math.round(st.gap)+'%'+(st.lost>=1? ' · −'+Math.round(st.lost)+' заказов в неделю':'')+
+            mktTxt+'</span>';
       }
       html+='<div class="fconv '+cls+'"><div class="c">'+(st?st.name:"")+': '+txt+'</div></div>';
     }
   });
+  /* размерный ряд — сквозной фактор: бьёт по показам, корзине и выкупу */
+  var sz=f.sizes;
+  if(sz&&sz.total>=2){
+    var szCls=sz.missing.length? (sz.share<0.6? "bad":"") : "good";
+    html+='<div class="fconv '+szCls+'"><div class="c">Размерный ряд: <b>'+sz.inStock+' из '+sz.total+'</b>'+
+      (sz.missing.length? ' <span class="fnorm">нет: '+sz.missing.slice(0,8).join(", ")+
+        (sz.missing.length>8? " и др.":"")+'</span>' : ' <span class="fnorm">весь в наличии</span>')+'</div></div>';
+  }
   box.innerHTML=html;
   /* вывод и чек-лист */
   var rp=rampInfo(sku);
@@ -1578,9 +1706,26 @@ function renderFunnel(sku){
     return;
   }
   var lostTxt=b.lost>=1? " Если довести ступень до нормы, это примерно <b>+"+Math.round(b.lost)+" заказов в неделю</b>." : "";
-  bnb.innerHTML='<div class="bnbox">Узкое место: <b>'+b.name+'</b> — '+fmt1(b.fact)+'% при норме '+
-    fmt1(b.norm)+'% ('+b.src+'), это '+Math.round(b.gap)+'%.'+lostTxt+
-    '<div class="bnlist">'+FUN_CHECK[b.k].split("·").map(function(x){return "<li>"+x.trim()+"</li>";}).join("")+'</div></div>';
+  var mktTxt2=(b.mkt&&b.lostMkt>=1)? " До рыночного ориентира "+fmt1(b.mkt)+"% — ещё +"+Math.round(b.lostMkt)+" заказов." : "";
+  /* размеры выше по течению: если ряд неполный, сначала он */
+  var szLead="";
+  if(sz&&sz.missing.length&&sz.total>=3&&sz.share<0.85){
+    szLead='<div class="bnbox" style="margin-bottom:8px">Сначала размеры: в наличии <b>'+sz.inStock+' из '+sz.total+
+      '</b> (нет: '+sz.missing.slice(0,6).join(", ")+'). Неполный ряд роняет ранжирование, удорожает рекламу и режет корзину — '+
+      'выводы ниже могут быть следствием этого.</div>';
+  }
+  /* цена как рычаг — сразу показываем запас маржи */
+  var mrg="";
+  var a7o=skuAgg(sku,periodDates(7).cur);
+  if((b.k==="ctr"||b.k==="cr1"||b.k==="cr2") && a7o.orders>0 && a7o.ordersRub>0){
+    var perOrder=a7o.profit/a7o.orders, price=a7o.ordersRub/a7o.orders;
+    var shareM=price>0? perOrder/price*100 : 0;
+    mrg='<div class="fnorm" style="margin-top:6px">Если рычагом будет цена: маржа до ДРР ≈ '+fmtInt(perOrder)+
+      ' ₽ с заказа при цене '+fmtInt(price)+' ₽ — это '+fmt1(shareM)+'% от цены, скидка больше уводит товар в минус.</div>';
+  }
+  bnb.innerHTML=szLead+'<div class="bnbox">Узкое место: <b>'+b.name+'</b> — '+fmt1(b.fact)+'% при норме '+
+    fmt1(b.norm)+'% ('+b.src+'), это '+Math.round(b.gap)+'%.'+lostTxt+mktTxt2+
+    '<div class="bnlist">'+FUN_CHECK[b.k].split("·").map(function(x){return "<li>"+x.trim()+"</li>";}).join("")+'</div>'+mrg+'</div>';
 }
 function scard(lbl,val,sub){
   return '<div class="scard"><div class="lbl">'+lbl+'</div><div class="val">'+val+'</div><div class="sub2">'+sub+'</div></div>';
@@ -1667,13 +1812,19 @@ function renderComment(sku){
     else if(d!==null&&d>=30) parts.push("заказы выросли на "+Math.round(d)+
       "% за неделю — проверить, хватит ли запаса на этот темп");
   }
-  /* 1б. узкое место воронки */
+  /* 1а. размерный ряд — причина выше по течению */
   var f=FUN[sku];
+  if(f && f.sizes && f.sizes.missing.length && f.sizes.total>=3 && f.sizes.share<0.85){
+    parts.unshift("в наличии "+f.sizes.inStock+" размеров из "+f.sizes.total+" (нет: "+
+      f.sizes.missing.slice(0,5).join(", ")+") — неполный ряд роняет ранжирование и режет конверсию, вернуть размеры в первую очередь");
+  }
+  /* 1б. узкое место воронки */
   if(!rp.ramp && f && f.bn){
     var b=f.bn;
     parts.push("узкое место воронки — «"+b.name+"»: "+fmt1(b.fact)+"% при норме "+fmt1(b.norm)+"% ("+b.src+")"+
       (b.lost>=1? ", это примерно "+Math.round(b.lost)+" потерянных заказов в неделю":"")+
-      "; проверить: "+FUN_CHECK[b.k]);
+      (b.mkt&&b.lostMkt>=1? "; до рыночного ориентира "+fmt1(b.mkt)+"% — ещё "+Math.round(b.lostMkt)+" заказов":"")+
+      "; проверить по порядку: "+FUN_CHECK[b.k]);
   }
   /* 2. выкуп относительно нормы ниши/сегмента */
   var buy=buyShare(sku,a7)*100;
