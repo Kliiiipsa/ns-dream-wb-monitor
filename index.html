@@ -358,6 +358,7 @@ var SPRAV_CSV_URL    = pubCsv(313377354);    // «Справочник»
 var SEZON_CSV_URL    = pubCsv(1988228604);   // «Сезонность»
 var COMM_CSV_URL     = pubCsv(2140403510);   // «Комментарии»
 var CONFIG_CSV_URL   = pubCsv(1329223578);   // «config»
+var PREDMET_CSV_URL  = pubCsv(1815084835);   // «Предметы WB» — настоящий предмет WB по nm_id (Content API)
 
 /* Платная таблица 10X WB (новый кабинет) — единственный источник дневных данных */
 var PAID_ID = "1rvBJVzeYFAYkzKCXK3EeBDyXBzZaW9DwJ4vcjP07ASg";
@@ -571,11 +572,13 @@ Promise.all([
   tryCSV(ANALYSIS_CSV_URL),
   tryCSV(SEZON_CSV_URL),
   tryCSV(COMM_CSV_URL),
-  tryCSV(CONFIG_CSV_URL)
+  tryCSV(CONFIG_CSV_URL),
+  tryCSV(PREDMET_CSV_URL)
 ]).then(function(res){
   parseConfig(res[6]);
   parseSprav(res[2]);
   parseCards(res[1]);          // cards поверх Справочника (свежее)
+  parsePredmet(res[7]);        // настоящий предмет WB перекрывает subject_name платной таблицы
   parseSeason(res[4]);
   parseComments(res[5]);
   parseAnalysis(res[3]);
@@ -677,6 +680,24 @@ function parseCards(rows){
     if(vc) CARDS[vc]={nm:nm, title:(r[iT]||"").trim(), category:(r[iS]||"").trim()};
     NMINFO[nm]={vc:vc, title:(r[iT]||"").trim(), category:(r[iS]||"").trim()};
   }
+}
+/* «Предметы WB» (Content API): nm_id | предмет WB | subjectID | бренд | название.
+   Настоящий предмет WB — самый точный источник категории; перекрывает subject_name. */
+var PREDMET={};    // nm -> предмет WB
+function parsePredmet(rows){
+  if(!rows||rows.length<2) return;
+  var h=rows[0].map(function(x){return (x||"").toLowerCase().trim();});
+  var iNm=h.indexOf("nm_id"), iP=h.indexOf("предмет wb");
+  if(iNm<0) iNm=0;
+  if(iP<0) iP=1;
+  for(var i=1;i<rows.length;i++){
+    var r=rows[i], nm=(r[iNm]||"").trim(), p=(r[iP]||"").trim();
+    if(!nm||!p) continue;
+    PREDMET[nm]=p;
+  }
+  /* перекрываем категорию в уже разобранных карточках настоящим предметом WB */
+  Object.keys(NMINFO).forEach(function(nm){ if(PREDMET[nm]) NMINFO[nm].category=PREDMET[nm]; });
+  Object.keys(CARDS).forEach(function(vc){ var c=CARDS[vc]; if(c&&PREDMET[c.nm]) c.category=PREDMET[c.nm]; });
 }
 function parseSeason(rows){
   if(!rows||rows.length<2) return;
