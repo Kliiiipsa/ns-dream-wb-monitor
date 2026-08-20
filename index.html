@@ -361,6 +361,8 @@ var CONFIG_CSV_URL   = pubCsv(1329223578);   // «config»
 var PREDMET_CSV_URL  = pubCsv(1815084835);   // «Предметы WB» — настоящий предмет WB по nm_id (Content API)
 var REVIEWS_CSV_URL  = pubCsv(1435460609);   // «Отзывы» — причины негатива словами покупателей (Feedbacks API)
 var QSUM_CSV_URL     = pubCsv(2031459424);   // «Запросы сводка» — спрос по ключам (отчёт Джем)
+var VITR_CSV_URL     = pubCsv(1571980446);   // «Витрина» — цена/рейтинг/отзывы/размеры из каталога WB
+var COMP_CSV_URL     = pubCsv(510614706);    // «Конкуренты» — назначенные вручную пары
 
 /* Платная таблица 10X WB (новый кабинет) — единственный источник дневных данных */
 var PAID_ID = "1rvBJVzeYFAYkzKCXK3EeBDyXBzZaW9DwJ4vcjP07ASg";
@@ -577,7 +579,9 @@ Promise.all([
   tryCSV(CONFIG_CSV_URL),
   tryCSV(PREDMET_CSV_URL),
   tryCSV(REVIEWS_CSV_URL),
-  tryCSV(QSUM_CSV_URL)
+  tryCSV(QSUM_CSV_URL),
+  tryCSV(VITR_CSV_URL),
+  tryCSV(COMP_CSV_URL)
 ]).then(function(res){
   parseConfig(res[6]);
   parseSprav(res[2]);
@@ -585,6 +589,8 @@ Promise.all([
   parsePredmet(res[7]);        // настоящий предмет WB перекрывает subject_name платной таблицы
   parseReviews(res[8]);        // отзывы: причина низкого выкупа словами покупателей
   parseQsum(res[9]);           // спрос по ключам (Джем)
+  parseVitrina(res[10]);       // цена на витрине, рейтинг, отзывы, размеры
+  parseComp(res[11]);          // назначенные конкуренты
   parseSeason(res[4]);
   parseComments(res[5]);
   parseAnalysis(res[3]);
@@ -782,6 +788,41 @@ function qsumOf(sku){
   if(QSUM[nm]) return QSUM[nm];
   var k=normName(p.title);
   return (k.length>8 && QSUM_BY_NAME[k]) ? QSUM_BY_NAME[k] : null;
+}
+/* «Витрина» (публичный каталог WB): nm_id | кто | название | бренд | цена | рейтинг |
+   отзывов | размеров | в наличии. Цена — то, что видит покупатель (после СПП).      */
+var VITR={};
+function parseVitrina(rows){
+  if(!rows||rows.length<2) return;
+  for(var i=1;i<rows.length;i++){
+    var r=rows[i], nm=(r[0]||"").trim();
+    if(!nm) continue;
+    VITR[nm]={kind:(r[1]||"").trim(), name:(r[2]||"").trim(), brand:(r[3]||"").trim(),
+              price:num(r[4]), rating:num(r[5]), fb:num(r[6]), sizes:num(r[7]), inStock:num(r[8])};
+  }
+}
+/* «Конкуренты»: наш артикул | конкурент 1 | конкурент 2 | комментарий (заполняется вручную) */
+var COMP={};
+function parseComp(rows){
+  if(!rows||rows.length<2) return;
+  for(var i=1;i<rows.length;i++){
+    var r=rows[i], mine=String(r[0]||"").trim();
+    if(!mine||mine.charAt(0)==="—") continue;
+    var list=[r[1],r[2]].map(function(x){return String(x||"").replace(/[^0-9]/g,"");})
+                        .filter(function(x){return x.length>=6;});
+    if(list.length) COMP[mine]=list;
+  }
+}
+/* наши конкуренты по товару: ключ — код или nm */
+function compOf(sku){
+  var p=PRODUCTS[sku]||{};
+  return COMP[String(sku)] || (p.nm? COMP[String(p.nm)] : null) || null;
+}
+/* цена на витрине по нашему товару (артикул нового кабинета) */
+function vitrOf(sku){
+  var p=PRODUCTS[sku]||{};
+  var nm=p.nm? String(p.nm) : String(sku);
+  return VITR[nm]||null;
 }
 function parseSeason(rows){
   if(!rows||rows.length<2) return;
@@ -1825,6 +1866,38 @@ function renderFunnel(sku){
     html+='<div class="fconv"><div class="c">Спрос по ключам: <b>'+qs.keys+'</b> запросов'+
       ' <span class="fnorm">трудные: '+esc(parts.join(" · "))+
       ' · частота рыночная, позиции — по карточке кабинета с Джемом</span></div></div>';
+  }
+  /* витрина: цена, которую видит покупатель, и СПП (разница с ценой кабинета) */
+  var vt=vitrOf(sku);
+  var a7v=skuAgg(sku, periodDates(7).cur);
+  if(vt && vt.price>0){
+    var own=(a7v.orders>0)? a7v.ordersRub/a7v.orders : 0;
+    var spp=(own>0 && vt.price<own)? (own-vt.price)/own*100 : 0;
+    html+='<div class="fconv"><div class="c">Цена на витрине: <b>'+fmtInt(vt.price)+' ₽</b>'+
+      (spp>0? ' <span class="fnorm">СПП ≈ '+fmt1(spp)+'% (в кабинете '+fmtInt(own)+' ₽)</span>'
+            : ' <span class="fnorm">рейтинг '+fmt1(vt.rating)+' · отзывов '+vt.fb+'</span>')+
+      '</div></div>';
+  }
+  /* против конкурентов: пары назначаются вручную в листе «Конкуренты» */
+  var cmp=compOf(sku);
+  if(cmp && cmp.length && vt){
+    var rowsC=cmp.map(function(nm){ return VITR[nm]? {nm:nm, v:VITR[nm]} : null; }).filter(Boolean);
+    if(rowsC.length){
+      var mark=function(mine,theirs,less){ if(!mine||!theirs) return "";
+        var bad=less? (mine>theirs) : (mine<theirs); return bad? ' style="color:var(--down)"':''; };
+      var t='<div class="fconv"><div class="c">Против конкурентов:</div></div>';
+      t+='<div class="fnorm" style="margin:2px 0 6px">мы: '+fmtInt(vt.price)+' ₽ · рейтинг '+fmt1(vt.rating)+
+         ' · отзывов '+vt.fb+' · размеров '+vt.inStock+' из '+vt.sizes+'</div>';
+      rowsC.forEach(function(c){
+        t+='<div class="fnorm"'+'>'+esc(c.v.brand||c.nm)+': <span'+mark(vt.price,c.v.price,true)+'>'+
+           fmtInt(c.v.price)+' ₽</span> · рейтинг <span'+mark(vt.rating,c.v.rating,false)+'>'+fmt1(c.v.rating)+
+           '</span> · отзывов <span'+mark(vt.fb,c.v.fb,false)+'>'+c.v.fb+'</span> · размеров '+
+           c.v.inStock+' из '+c.v.sizes+'</div>';
+      });
+      html+=t;
+    }
+  } else if(vt && !cmp && (typeof COMP==='object') ){
+    html+='<div class="fnorm" style="margin-top:4px">Конкуренты не назначены — впишите 2 артикула в лист «Конкуренты», и сравнение появится здесь.</div>';
   }
   box.innerHTML=html;
   /* вывод и чек-лист */
