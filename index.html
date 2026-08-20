@@ -360,6 +360,7 @@ var COMM_CSV_URL     = pubCsv(2140403510);   // «Комментарии»
 var CONFIG_CSV_URL   = pubCsv(1329223578);   // «config»
 var PREDMET_CSV_URL  = pubCsv(1815084835);   // «Предметы WB» — настоящий предмет WB по nm_id (Content API)
 var REVIEWS_CSV_URL  = pubCsv(1435460609);   // «Отзывы» — причины негатива словами покупателей (Feedbacks API)
+var QSUM_CSV_URL     = pubCsv(2031459424);   // «Запросы сводка» — спрос по ключам (отчёт Джем)
 
 /* Платная таблица 10X WB (новый кабинет) — единственный источник дневных данных */
 var PAID_ID = "1rvBJVzeYFAYkzKCXK3EeBDyXBzZaW9DwJ4vcjP07ASg";
@@ -575,13 +576,15 @@ Promise.all([
   tryCSV(COMM_CSV_URL),
   tryCSV(CONFIG_CSV_URL),
   tryCSV(PREDMET_CSV_URL),
-  tryCSV(REVIEWS_CSV_URL)
+  tryCSV(REVIEWS_CSV_URL),
+  tryCSV(QSUM_CSV_URL)
 ]).then(function(res){
   parseConfig(res[6]);
   parseSprav(res[2]);
   parseCards(res[1]);          // cards поверх Справочника (свежее)
   parsePredmet(res[7]);        // настоящий предмет WB перекрывает subject_name платной таблицы
   parseReviews(res[8]);        // отзывы: причина низкого выкупа словами покупателей
+  parseQsum(res[9]);           // спрос по ключам (Джем)
   parseSeason(res[4]);
   parseComments(res[5]);
   parseAnalysis(res[3]);
@@ -754,6 +757,31 @@ function reviewsOf(sku){
   if(REVIEWS[nm]) return REVIEWS[nm];
   var k=normName(p.title);
   return (k.length>8 && REVIEWS_BY_NAME[k]) ? REVIEWS_BY_NAME[k] : null;
+}
+/* «Запросы сводка» (отчёт Джем): nm_id | название | ключей | видимых | медиана %рынка |
+   слабые частотные ключи | сильный ключ.
+   ВАЖНО: частотность запросов — общерыночная, а позиции и %рынка относятся к карточке
+   того кабинета, где подключён Джем, а не к текущей карточке ФБС. Поэтому показываем
+   это как спрос и материал для СЕО, а не как «наша позиция сейчас».               */
+var QSUM={}, QSUM_BY_NAME={};
+function parseQsum(rows){
+  if(!rows||rows.length<2) return;
+  for(var i=1;i<rows.length;i++){
+    var r=rows[i], nm=(r[0]||"").trim();
+    if(!nm) continue;
+    var o={keys:num(r[2]), vis:num(r[3]), med:num(r[4]),
+           weak:(r[5]||"").trim(), best:(r[6]||"").trim(), name:(r[1]||"").trim()};
+    QSUM[nm]=o;
+    var k=normName(r[1]);
+    if(k.length>8){ var p=QSUM_BY_NAME[k]; if(!p||o.keys>p.keys) QSUM_BY_NAME[k]=o; }
+  }
+}
+function qsumOf(sku){
+  var p=PRODUCTS[sku]||{};
+  var nm=p.nm? String(p.nm) : String(sku);
+  if(QSUM[nm]) return QSUM[nm];
+  var k=normName(p.title);
+  return (k.length>8 && QSUM_BY_NAME[k]) ? QSUM_BY_NAME[k] : null;
 }
 function parseSeason(rows){
   if(!rows||rows.length<2) return;
@@ -1790,6 +1818,14 @@ function renderFunnel(sku){
       (rv.neg30>0? ', из них '+rv.neg30+' за 30 дней':'')+
       (rv.themes? ' · '+esc(rv.themes):'')+'</span></div></div>';
   }
+  /* спрос по ключам из отчёта Джем: частотность рыночная, позиции — карточки с Джемом */
+  var qs=qsumOf(sku);
+  if(qs && qs.weak){
+    var parts=qs.weak.split("|").map(function(x){return x.trim();}).filter(Boolean).slice(0,3);
+    html+='<div class="fconv"><div class="c">Спрос по ключам: <b>'+qs.keys+'</b> запросов'+
+      ' <span class="fnorm">трудные: '+esc(parts.join(" · "))+
+      ' · частота рыночная, позиции — по карточке кабинета с Джемом</span></div></div>';
+  }
   box.innerHTML=html;
   /* вывод и чек-лист */
   var rp=rampInfo(sku);
@@ -1822,6 +1858,14 @@ function renderFunnel(sku){
     mrg='<div class="fnorm" style="margin-top:6px">Если рычагом будет цена: маржа до ДРР ≈ '+fmtInt(perOrder)+
       ' ₽ с заказа при цене '+fmtInt(price)+' ₽ — это '+fmt1(shareM)+'% от цены, скидка больше уводит товар в минус.</div>';
   }
+  /* если узкое место — показы/клики, подсказываем ключи со спросом */
+  var qLead="";
+  if((b.k==="ctr"||b.k==="cr1") && qs && qs.weak){
+    var w=qs.weak.split("|")[0].trim();
+    if(w) qLead='<div class="bnbox" style="margin-bottom:8px">Спрос есть здесь: <b>'+esc(w)+
+      '</b>. Ключ частотный, но карточка по нему стоит низко — материал для СЕО и рекламы.'+
+      '<div class="fnorm" style="margin-top:6px">Частотность рыночная; позиция — по карточке кабинета, где подключён Джем.</div></div>';
+  }
   /* если узкое место — выкуп, причину дают сами покупатели */
   var rvLead="";
   if(b.k==="buy" && rv && rv.themes){
@@ -1829,7 +1873,7 @@ function renderFunnel(sku){
       (rv.samples.length? '<div class="fnorm" style="margin-top:6px">«'+esc(rv.samples[0])+'»</div>' : '')+
       '</div>';
   }
-  bnb.innerHTML=szLead+rvLead+'<div class="bnbox">Узкое место: <b>'+b.name+'</b> — '+fmt1(b.fact)+'% при норме '+
+  bnb.innerHTML=szLead+qLead+rvLead+'<div class="bnbox">Узкое место: <b>'+b.name+'</b> — '+fmt1(b.fact)+'% при норме '+
     fmt1(b.norm)+'% ('+b.src+'), это '+Math.round(b.gap)+'%.'+lostTxt+mktTxt2+
     '<div class="bnlist">'+FUN_CHECK[b.k].split("·").map(function(x){return "<li>"+x.trim()+"</li>";}).join("")+'</div>'+mrg+'</div>';
 }
