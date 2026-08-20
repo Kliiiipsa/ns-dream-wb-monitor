@@ -686,40 +686,74 @@ function parseCards(rows){
 }
 /* «Предметы WB» (Content API): nm_id | предмет WB | subjectID | бренд | название.
    Настоящий предмет WB — самый точный источник категории; перекрывает subject_name. */
-var PREDMET={};    // nm -> предмет WB
+var PREDMET={};          // nm -> предмет WB
+var PREDMET_BY_NAME={};  // нормализованное название -> предмет WB
 function parsePredmet(rows){
   if(!rows||rows.length<2) return;
   var h=rows[0].map(function(x){return (x||"").toLowerCase().trim();});
-  var iNm=h.indexOf("nm_id"), iP=h.indexOf("предмет wb");
+  var iNm=h.indexOf("nm_id"), iP=h.indexOf("предмет wb"), iT=h.indexOf("название");
   if(iNm<0) iNm=0;
   if(iP<0) iP=1;
+  if(iT<0) iT=4;
   for(var i=1;i<rows.length;i++){
     var r=rows[i], nm=(r[iNm]||"").trim(), p=(r[iP]||"").trim();
     if(!nm||!p) continue;
     PREDMET[nm]=p;
+    var key=normName(r[iT]);
+    if(key.length>8) PREDMET_BY_NAME[key]=p;
   }
-  /* перекрываем категорию в уже разобранных карточках настоящим предметом WB */
-  Object.keys(NMINFO).forEach(function(nm){ if(PREDMET[nm]) NMINFO[nm].category=PREDMET[nm]; });
-  Object.keys(CARDS).forEach(function(vc){ var c=CARDS[vc]; if(c&&PREDMET[c.nm]) c.category=PREDMET[c.nm]; });
+  /* перекрываем категорию в уже разобранных карточках настоящим предметом WB;
+     если артикул из другого кабинета — связываем по названию модели */
+  Object.keys(NMINFO).forEach(function(nm){
+    var inf=NMINFO[nm];
+    var p=PREDMET[nm] || PREDMET_BY_NAME[normName(inf.title)];
+    if(p) inf.category=p;
+  });
+  Object.keys(CARDS).forEach(function(vc){
+    var c=CARDS[vc]; if(!c) return;
+    var p=PREDMET[c.nm] || PREDMET_BY_NAME[normName(c.title)];
+    if(p) c.category=p;
+  });
 }
 /* «Отзывы»: nm_id | всего | средняя | негатив(1-3) | негатив 30дн | топ-жалобы | примеры.
    Собирает утренняя задача из API отзывов кабинета. */
-var REVIEWS={};    // nm -> {n, avg, neg, neg30, themes, samples[]}
+var REVIEWS={};    // nm -> {...}
+var REVIEWS_BY_NAME={};   // нормализованное название -> {...}
+/* Карточки кабинета и данные ФБС — из разных кабинетов WB: артикулы не совпадают,
+   поэтому связываем по названию модели (товар физически тот же).            */
+function normName(s){
+  return String(s||"").toLowerCase().replace(/ё/g,"е").replace(/[^a-zа-я0-9 ]/g," ")
+         .replace(/\s+/g," ").trim();
+}
 function parseReviews(rows){
   if(!rows||rows.length<2) return;
+  var h=rows[0].map(function(x){return (x||"").toLowerCase().trim();});
+  var wide=h.indexOf("название")===1;   // новый формат: nm_id | название | ...
   for(var i=1;i<rows.length;i++){
     var r=rows[i], nm=(r[0]||"").trim();
     if(!nm) continue;
-    var th=(r[5]||"").trim();
-    var sm=(r[6]||"").split("||").map(function(x){return x.trim();}).filter(function(x){return x.length>10;});
-    REVIEWS[nm]={n:num(r[1]), avg:num(r[2]), neg:num(r[3]), neg30:num(r[4]), themes:th, samples:sm};
+    var o=wide
+      ? {n:num(r[2]), avg:num(r[3]), neg:num(r[4]), neg30:num(r[5]), themes:(r[6]||"").trim(),
+         samples:(r[7]||"").split("||").map(function(x){return x.trim();}).filter(function(x){return x.length>10;})}
+      : {n:num(r[1]), avg:num(r[2]), neg:num(r[3]), neg30:num(r[4]), themes:(r[5]||"").trim(),
+         samples:(r[6]||"").split("||").map(function(x){return x.trim();}).filter(function(x){return x.length>10;})};
+    REVIEWS[nm]=o;
+    if(wide){
+      var key=normName(r[1]);
+      if(key.length>8){
+        var prev=REVIEWS_BY_NAME[key];
+        if(!prev || o.n>prev.n) REVIEWS_BY_NAME[key]=o;   // при дублях берём карточку с большим числом отзывов
+      }
+    }
   }
 }
-/* отзывы по товару (sku -> nm) */
+/* отзывы по товару: сначала по артикулу, иначе по названию модели */
 function reviewsOf(sku){
-  var p=PRODUCTS[sku];
-  var nm=p&&p.nm? String(p.nm) : String(sku);
-  return REVIEWS[nm]||null;
+  var p=PRODUCTS[sku]||{};
+  var nm=p.nm? String(p.nm) : String(sku);
+  if(REVIEWS[nm]) return REVIEWS[nm];
+  var k=normName(p.title);
+  return (k.length>8 && REVIEWS_BY_NAME[k]) ? REVIEWS_BY_NAME[k] : null;
 }
 function parseSeason(rows){
   if(!rows||rows.length<2) return;
