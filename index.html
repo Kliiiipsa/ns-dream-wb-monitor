@@ -359,6 +359,7 @@ var SEZON_CSV_URL    = pubCsv(1988228604);   // «Сезонность»
 var COMM_CSV_URL     = pubCsv(2140403510);   // «Комментарии»
 var CONFIG_CSV_URL   = pubCsv(1329223578);   // «config»
 var PREDMET_CSV_URL  = pubCsv(1815084835);   // «Предметы WB» — настоящий предмет WB по nm_id (Content API)
+var REVIEWS_CSV_URL  = pubCsv(1435460609);   // «Отзывы» — причины негатива словами покупателей (Feedbacks API)
 
 /* Платная таблица 10X WB (новый кабинет) — единственный источник дневных данных */
 var PAID_ID = "1rvBJVzeYFAYkzKCXK3EeBDyXBzZaW9DwJ4vcjP07ASg";
@@ -573,12 +574,14 @@ Promise.all([
   tryCSV(SEZON_CSV_URL),
   tryCSV(COMM_CSV_URL),
   tryCSV(CONFIG_CSV_URL),
-  tryCSV(PREDMET_CSV_URL)
+  tryCSV(PREDMET_CSV_URL),
+  tryCSV(REVIEWS_CSV_URL)
 ]).then(function(res){
   parseConfig(res[6]);
   parseSprav(res[2]);
   parseCards(res[1]);          // cards поверх Справочника (свежее)
   parsePredmet(res[7]);        // настоящий предмет WB перекрывает subject_name платной таблицы
+  parseReviews(res[8]);        // отзывы: причина низкого выкупа словами покупателей
   parseSeason(res[4]);
   parseComments(res[5]);
   parseAnalysis(res[3]);
@@ -698,6 +701,25 @@ function parsePredmet(rows){
   /* перекрываем категорию в уже разобранных карточках настоящим предметом WB */
   Object.keys(NMINFO).forEach(function(nm){ if(PREDMET[nm]) NMINFO[nm].category=PREDMET[nm]; });
   Object.keys(CARDS).forEach(function(vc){ var c=CARDS[vc]; if(c&&PREDMET[c.nm]) c.category=PREDMET[c.nm]; });
+}
+/* «Отзывы»: nm_id | всего | средняя | негатив(1-3) | негатив 30дн | топ-жалобы | примеры.
+   Собирает утренняя задача из API отзывов кабинета. */
+var REVIEWS={};    // nm -> {n, avg, neg, neg30, themes, samples[]}
+function parseReviews(rows){
+  if(!rows||rows.length<2) return;
+  for(var i=1;i<rows.length;i++){
+    var r=rows[i], nm=(r[0]||"").trim();
+    if(!nm) continue;
+    var th=(r[5]||"").trim();
+    var sm=(r[6]||"").split("||").map(function(x){return x.trim();}).filter(function(x){return x.length>10;});
+    REVIEWS[nm]={n:num(r[1]), avg:num(r[2]), neg:num(r[3]), neg30:num(r[4]), themes:th, samples:sm};
+  }
+}
+/* отзывы по товару (sku -> nm) */
+function reviewsOf(sku){
+  var p=PRODUCTS[sku];
+  var nm=p&&p.nm? String(p.nm) : String(sku);
+  return REVIEWS[nm]||null;
 }
 function parseSeason(rows){
   if(!rows||rows.length<2) return;
@@ -1723,6 +1745,17 @@ function renderFunnel(sku){
       (sz.missing.length? ' <span class="fnorm">нет: '+sz.missing.slice(0,8).join(", ")+
         (sz.missing.length>8? " и др.":"")+'</span>' : ' <span class="fnorm">весь в наличии</span>')+'</div></div>';
   }
+  /* отзывы: причина потерь словами покупателей — ставим рядом с воронкой */
+  var rv=reviewsOf(sku);
+  if(rv && rv.n>0){
+    var negShare=rv.n? rv.neg/rv.n*100 : 0;
+    var rvCls=(negShare>=15||rv.neg30>=3)? "bad" : (negShare<=5? "good":"");
+    html+='<div class="fconv '+rvCls+'"><div class="c">Отзывы: <b>'+rv.n+'</b>'+
+      (rv.avg? ' · рейтинг '+fmt1(rv.avg):'')+
+      ' <span class="fnorm">негатив '+rv.neg+' ('+fmt1(negShare)+'%)'+
+      (rv.neg30>0? ', из них '+rv.neg30+' за 30 дней':'')+
+      (rv.themes? ' · '+esc(rv.themes):'')+'</span></div></div>';
+  }
   box.innerHTML=html;
   /* вывод и чек-лист */
   var rp=rampInfo(sku);
@@ -1755,7 +1788,14 @@ function renderFunnel(sku){
     mrg='<div class="fnorm" style="margin-top:6px">Если рычагом будет цена: маржа до ДРР ≈ '+fmtInt(perOrder)+
       ' ₽ с заказа при цене '+fmtInt(price)+' ₽ — это '+fmt1(shareM)+'% от цены, скидка больше уводит товар в минус.</div>';
   }
-  bnb.innerHTML=szLead+'<div class="bnbox">Узкое место: <b>'+b.name+'</b> — '+fmt1(b.fact)+'% при норме '+
+  /* если узкое место — выкуп, причину дают сами покупатели */
+  var rvLead="";
+  if(b.k==="buy" && rv && rv.themes){
+    rvLead='<div class="bnbox" style="margin-bottom:8px">Что пишут в отзывах: <b>'+esc(rv.themes)+'</b>.'+
+      (rv.samples.length? '<div class="fnorm" style="margin-top:6px">«'+esc(rv.samples[0])+'»</div>' : '')+
+      '</div>';
+  }
+  bnb.innerHTML=szLead+rvLead+'<div class="bnbox">Узкое место: <b>'+b.name+'</b> — '+fmt1(b.fact)+'% при норме '+
     fmt1(b.norm)+'% ('+b.src+'), это '+Math.round(b.gap)+'%.'+lostTxt+mktTxt2+
     '<div class="bnlist">'+FUN_CHECK[b.k].split("·").map(function(x){return "<li>"+x.trim()+"</li>";}).join("")+'</div>'+mrg+'</div>';
 }
@@ -1863,8 +1903,11 @@ function renderComment(sku){
   var bst=buyStatus(buy,bn);
   var normTxt="норма "+fmt1(bn.low)+"–"+fmt1(bn.high)+"% ("+bn.src+
     (bn.isMarket? ", средний "+fmt1(bn.base)+"%":"")+")";
-  if(bst==="crit") parts.push("выкуп "+fmt1(buy)+"% — ниже критических "+NORM.critBuy+"%: "+CRIT_REC);
-  else if(bst==="low") parts.push("выкуп "+fmt1(buy)+"% ниже нормы ("+normTxt+") — "+BUY_REC);
+  /* причина низкого выкупа — не гипотеза, а то, что пишут покупатели */
+  var rvC=reviewsOf(sku);
+  var rvTxt=(rvC&&rvC.themes)? "; в отзывах чаще всего — "+rvC.themes : "";
+  if(bst==="crit") parts.push("выкуп "+fmt1(buy)+"% — ниже критических "+NORM.critBuy+"%: "+CRIT_REC+rvTxt);
+  else if(bst==="low") parts.push("выкуп "+fmt1(buy)+"% ниже нормы ("+normTxt+") — "+BUY_REC+rvTxt);
   else if(bst==="high") parts.push("выкуп "+fmt1(buy)+"% выше нормы ("+normTxt+") — показатель отличный, товар можно масштабировать");
   else if(bst==="ok") parts.push("выкуп "+fmt1(buy)+"% в коридоре нормы ("+normTxt+")");
   /* 3. запас относительно нормы фазы сезона */
